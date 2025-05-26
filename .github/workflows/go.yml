@@ -1,4 +1,4 @@
-name: Go
+name: Go CI/CD
 
 on:
   push:
@@ -6,9 +6,13 @@ on:
   pull_request:
     branches: [ main ]
 
-jobs:
+env:
+  GO_VERSION: '1.24'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
 
-  build:
+jobs:
+  lint:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -16,10 +20,101 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
 
-    - name: Build
-      run: go build -v ./cmd/api
+    - name: Lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
 
-    - name: Test
-      run: go test -v ./... 
+    - name: Verify dependencies
+      run: go mod verify
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Run gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: ./...
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [lint, security-scan]
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        buildkitd-flags: --debug
+
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    - name: Executar testes em Docker
+      run: |
+        docker-compose -f deployments/docker-compose.ci.yml up --build --abort-on-container-exit
+        exit_code=$?
+        docker-compose -f deployments/docker-compose.ci.yml down -v
+        exit $exit_code
+
+    - name: Extrair relatório de cobertura
+      if: success()
+      run: |
+        docker cp go-auth-test:/tmp/coverage.out ./coverage.out
+        
+    - name: Upload relatório de cobertura
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: coverage.out
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    - name: Build e push da imagem Docker
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deployments/Dockerfile.ci
+        target: production
+        push: false
+        tags: go-auth-system:latest
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+        
+    - name: Move cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache 
