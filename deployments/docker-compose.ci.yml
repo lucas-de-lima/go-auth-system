@@ -36,6 +36,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=auth_system
+      - POSTGRES_HOST_AUTH_METHOD=trust
     # Não usamos volumes persistentes no CI para garantir um ambiente limpo
     tmpfs:
       - /var/lib/postgresql/data
@@ -43,4 +44,5 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5 
+      retries: 5
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"] 

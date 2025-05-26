@@ -7,12 +7,13 @@ on:
     branches: [ main ]
 
 env:
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.24.3'
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
 
 jobs:
-  lint:
+  # Primeiro, gerar o cliente Prisma para uso em outras etapas
+  generate-prisma:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -22,6 +23,42 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
+
+    - name: Generate Prisma Client
+      run: |
+        cd prisma
+        go run cmd/run_prisma.go generate
+
+    - name: Cache Prisma Client
+      uses: actions/cache@v3
+      with:
+        path: prisma/db
+        key: ${{ runner.os }}-prisma-${{ github.sha }}
+
+  lint:
+    needs: generate-prisma
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    - name: Restore Prisma Client
+      uses: actions/cache@v3
+      with:
+        path: prisma/db
+        key: ${{ runner.os }}-prisma-${{ github.sha }}
+
+    - name: Verify Prisma Client
+      run: |
+        if [ ! -d "prisma/db" ]; then
+          echo "Prisma client not found in cache, generating..."
+          cd prisma && go run cmd/run_prisma.go generate
+        fi
 
     - name: Lint
       uses: golangci/golangci-lint-action@v3
@@ -33,6 +70,7 @@ jobs:
       run: go mod verify
 
   security-scan:
+    needs: generate-prisma
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -41,6 +79,19 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+
+    - name: Restore Prisma Client
+      uses: actions/cache@v3
+      with:
+        path: prisma/db
+        key: ${{ runner.os }}-prisma-${{ github.sha }}
+
+    - name: Verify Prisma Client
+      run: |
+        if [ ! -d "prisma/db" ]; then
+          echo "Prisma client not found in cache, generating..."
+          cd prisma && go run cmd/run_prisma.go generate
+        fi
 
     - name: Run gosec Security Scanner
       uses: securego/gosec@master
@@ -77,10 +128,10 @@ jobs:
     - name: Extrair relatório de cobertura
       if: success()
       run: |
-        docker cp go-auth-test:/tmp/coverage.out ./coverage.out
+        docker cp go-auth-test:/tmp/coverage.out ./coverage.out || echo "Failed to extract coverage report"
         
     - name: Upload relatório de cobertura
-      if: success()
+      if: success() && hashFiles('./coverage.out') != ''
       uses: actions/upload-artifact@v3
       with:
         name: coverage-report
