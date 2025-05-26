@@ -1,24 +1,24 @@
 package service
 
 import (
-	"errors"
 	"time"
 
 	"github.com/lucas-de-lima/go-auth-system/internal/auth"
 	"github.com/lucas-de-lima/go-auth-system/internal/domain"
 	"github.com/lucas-de-lima/go-auth-system/internal/repository"
+	"github.com/lucas-de-lima/go-auth-system/pkg/errors"
 	"github.com/lucas-de-lima/go-auth-system/pkg/logging"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // UserService implementa a interface domain.UserService
 type UserService struct {
-	userRepo   repository.UserRepository
+	userRepo   *repository.UserRepository
 	jwtService *auth.JWTService
 }
 
 // NewUserService cria uma nova instância do serviço de usuário
-func NewUserService(userRepo repository.UserRepository, jwtService *auth.JWTService) *UserService {
+func NewUserService(userRepo *repository.UserRepository, jwtService *auth.JWTService) *UserService {
 	return &UserService{
 		userRepo:   userRepo,
 		jwtService: jwtService,
@@ -26,18 +26,23 @@ func NewUserService(userRepo repository.UserRepository, jwtService *auth.JWTServ
 }
 
 // Create cria um novo usuário
-func (s *UserService) Create(user *domain.User) error {
+func (us *UserService) Create(user *domain.User) error {
 	// Verifica se já existe um usuário com o mesmo email
-	existingUser, _ := s.userRepo.GetByEmail(user.Email)
+	existingUser, err := us.userRepo.GetByEmail(user.Email)
+	if err != nil {
+		logging.Error("Erro ao verificar email: %v", err)
+		return errors.ErrInternalServer.WithError(err)
+	}
+
 	if existingUser != nil {
-		return errors.New("email já está em uso")
+		return errors.ErrEmailAlreadyExists
 	}
 
 	// Hash da senha
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		logging.Error("Erro ao gerar hash da senha: %v", err)
-		return err
+		return errors.ErrInternalServer.WithError(err)
 	}
 
 	// Atualiza a senha com o hash
@@ -46,75 +51,117 @@ func (s *UserService) Create(user *domain.User) error {
 	user.UpdatedAt = time.Now()
 
 	// Salva o usuário no repositório
-	return s.userRepo.Create(user)
+	err = us.userRepo.Create(user)
+	if err != nil {
+		logging.Error("Erro ao criar usuário: %v", err)
+		return errors.ErrInternalServer.WithError(err)
+	}
+
+	return nil
 }
 
 // GetByID busca um usuário pelo ID
-func (s *UserService) GetByID(id string) (*domain.User, error) {
-	return s.userRepo.GetByID(id)
-}
-
-// GetByEmail busca um usuário pelo email
-func (s *UserService) GetByEmail(email string) (*domain.User, error) {
-	return s.userRepo.GetByEmail(email)
-}
-
-// Update atualiza os dados de um usuário
-func (s *UserService) Update(user *domain.User) error {
-	existingUser, err := s.userRepo.GetByID(user.ID)
+func (us *UserService) GetByID(id string) (*domain.User, error) {
+	user, err := us.userRepo.GetByID(id)
 	if err != nil {
-		return err
-	}
-
-	if existingUser == nil {
-		return errors.New("usuário não encontrado")
-	}
-
-	// Se estiver atualizando a senha, hash da nova senha
-	if user.Password != "" {
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-		if err != nil {
-			logging.Error("Erro ao gerar hash da senha: %v", err)
-			return err
-		}
-		user.Password = string(hashedPassword)
-	} else {
-		// Mantém a senha atual
-		user.Password = existingUser.Password
-	}
-
-	user.UpdatedAt = time.Now()
-	return s.userRepo.Update(user)
-}
-
-// Delete remove um usuário pelo ID
-func (s *UserService) Delete(id string) error {
-	return s.userRepo.Delete(id)
-}
-
-// Authenticate autentica um usuário e retorna um token JWT
-func (s *UserService) Authenticate(email, password string) (string, error) {
-	user, err := s.userRepo.GetByEmail(email)
-	if err != nil {
-		return "", err
+		logging.Error("Erro ao buscar usuário por ID: %v", err)
+		return nil, errors.ErrInternalServer.WithError(err)
 	}
 
 	if user == nil {
-		return "", errors.New("credenciais inválidas")
+		return nil, errors.ErrUserNotFound
+	}
+
+	return user, nil
+}
+
+// GetByEmail busca um usuário pelo email
+func (us *UserService) GetByEmail(email string) (*domain.User, error) {
+	user, err := us.userRepo.GetByEmail(email)
+	if err != nil {
+		logging.Error("Erro ao buscar usuário por email: %v", err)
+		return nil, errors.ErrInternalServer.WithError(err)
+	}
+
+	if user == nil {
+		return nil, errors.ErrUserNotFound
+	}
+
+	return user, nil
+}
+
+// Update atualiza os dados de um usuário
+func (us *UserService) Update(user *domain.User) error {
+	// Verifica se o usuário existe
+	existingUser, err := us.userRepo.GetByID(user.ID)
+	if err != nil {
+		logging.Error("Erro ao verificar usuário: %v", err)
+		return errors.ErrInternalServer.WithError(err)
+	}
+
+	if existingUser == nil {
+		return errors.ErrUserNotFound
+	}
+
+	// Atualiza o usuário
+	user.UpdatedAt = time.Now()
+	err = us.userRepo.Update(user)
+	if err != nil {
+		logging.Error("Erro ao atualizar usuário: %v", err)
+		return errors.ErrInternalServer.WithError(err)
+	}
+
+	return nil
+}
+
+// Delete remove um usuário
+func (us *UserService) Delete(id string) error {
+	// Verifica se o usuário existe
+	existingUser, err := us.userRepo.GetByID(id)
+	if err != nil {
+		logging.Error("Erro ao verificar usuário: %v", err)
+		return errors.ErrInternalServer.WithError(err)
+	}
+
+	if existingUser == nil {
+		return errors.ErrUserNotFound
+	}
+
+	// Remove o usuário
+	err = us.userRepo.Delete(id)
+	if err != nil {
+		logging.Error("Erro ao excluir usuário: %v", err)
+		return errors.ErrInternalServer.WithError(err)
+	}
+
+	return nil
+}
+
+// Authenticate autentica um usuário e retorna um token JWT
+func (us *UserService) Authenticate(email, password string) (string, error) {
+	// Busca o usuário pelo email
+	user, err := us.userRepo.GetByEmail(email)
+	if err != nil {
+		logging.Error("Erro ao buscar usuário para autenticação: %v", err)
+		return "", errors.ErrInternalServer.WithError(err)
+	}
+
+	if user == nil {
+		return "", errors.ErrInvalidCredentials
 	}
 
 	// Verifica a senha
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		logging.Error("Senha incorreta: %v", err)
-		return "", errors.New("credenciais inválidas")
+		logging.Error("Senha inválida para usuário %s: %v", email, err)
+		return "", errors.ErrInvalidCredentials
 	}
 
-	// Gera token JWT
-	token, err := s.jwtService.GenerateToken(user)
+	// Gera o token JWT
+	token, err := us.jwtService.GenerateToken(user)
 	if err != nil {
 		logging.Error("Erro ao gerar token JWT: %v", err)
-		return "", err
+		return "", errors.ErrInternalServer.WithError(err)
 	}
 
 	return token, nil
