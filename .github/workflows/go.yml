@@ -115,10 +115,22 @@ jobs:
           cd prisma && go run cmd/run_prisma.go generate
         fi
 
+    - name: Install gosec
+      run: |
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        gosec --version
+
     - name: Run gosec Security Scanner
-      uses: securego/gosec@master
+      run: |
+        gosec -fmt=text -out=gosec-results.txt ./...
+        cat gosec-results.txt
+
+    - name: Upload gosec results
+      if: success() || failure()
+      uses: actions/upload-artifact@v3
       with:
-        args: ./...
+        name: gosec-results
+        path: gosec-results.txt
 
   test:
     runs-on: ubuntu-latest

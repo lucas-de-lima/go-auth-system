@@ -44,7 +44,7 @@ Workflow do GitHub Actions melhorado com:
 - Cache do cliente Prisma gerado entre jobs
 - Formatação automática do código (go fmt) antes do linting
 - Configuração personalizada do golangci-lint para controle fino de linting
-- Verificação de segurança com gosec
+- Instalação e execução direta do gosec com a versão correta do Go
 - Cache otimizado para camadas Docker
 - Extração e upload de relatórios de cobertura de testes
 - Timeout global para evitar builds presos
@@ -57,7 +57,7 @@ Workflow do GitHub Actions melhorado com:
 2. **Verificação de código**: 
    - Formatação automática do código
    - Linting com configuração personalizada
-   - Análise de segurança usando o cliente Prisma em cache
+   - Análise de segurança usando gosec instalado diretamente no ambiente CI
 3. **Execução de testes**:
    - O PostgreSQL é iniciado com healthcheck e otimizações
    - As migrações do Prisma são aplicadas
@@ -72,6 +72,10 @@ Para executar o mesmo ambiente de CI localmente:
 ```bash
 # Formatar o código
 go fmt ./...
+
+# Instalar e executar gosec
+go install github.com/securego/gosec/v2/cmd/gosec@latest
+gosec ./...
 
 # Executar os testes
 docker-compose -f deployments/docker-compose.ci.yml up --build
@@ -102,7 +106,7 @@ docker-compose -f deployments/docker-compose.ci.yml down -v
 - Formatação automática do código antes do linting
 - Linting com golangci-lint após geração do cliente Prisma
 - Configuração personalizada de linting para controle fino de regras
-- Verificação de segurança com gosec
+- Verificação de segurança com gosec instalado diretamente no ambiente CI
 - Geração de relatórios de cobertura de testes
 - Verificação de dependências
 - Correção de erros comuns como verificação de valores de retorno
@@ -129,6 +133,7 @@ O erro `go.mod requires go >= 1.24.3 (running go 1.24.2)` foi resolvido com:
 
 1. Especificação explícita da versão Go 1.24.3 em todos os ambientes
 2. Uso da mesma versão no Dockerfile.ci e no workflow do GitHub Actions
+3. Instalação direta do gosec usando o Go 1.24.3 configurado no ambiente
 
 ### Problema: Erros de linting
 
