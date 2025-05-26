@@ -6,6 +6,7 @@ import (
 
 	"github.com/lucas-de-lima/go-auth-system/internal/domain"
 	"github.com/lucas-de-lima/go-auth-system/internal/service"
+	"github.com/lucas-de-lima/go-auth-system/pkg/errors"
 	"github.com/lucas-de-lima/go-auth-system/pkg/logging"
 )
 
@@ -38,7 +39,19 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logging.Error("Erro ao decodificar corpo da requisição: %v", err)
-		http.Error(w, "Erro ao processar solicitação", http.StatusBadRequest)
+		errors.HandleError(w, errors.ErrBadRequest.WithError(err))
+		return
+	}
+
+	// Validação básica
+	if req.Email == "" || req.Password == "" || req.Name == "" {
+		details := []errors.ValidationDetail{
+			{Field: "email", Message: "Email é obrigatório"},
+			{Field: "password", Message: "Senha é obrigatória"},
+			{Field: "name", Message: "Nome é obrigatório"},
+		}
+		validationErr := errors.NewValidationError("Campos obrigatórios não preenchidos", details)
+		errors.HandleError(w, validationErr)
 		return
 	}
 
@@ -50,13 +63,11 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.userService.Create(user); err != nil {
 		logging.Error("Erro ao criar usuário: %v", err)
-		http.Error(w, "Erro ao criar usuário", http.StatusInternalServerError)
+		errors.HandleError(w, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	errors.RespondWithJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Usuário registrado com sucesso",
 		"id":      user.ID,
 	})
@@ -71,19 +82,18 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logging.Error("Erro ao decodificar corpo da requisição: %v", err)
-		http.Error(w, "Erro ao processar solicitação", http.StatusBadRequest)
+		errors.HandleError(w, errors.ErrBadRequest.WithError(err))
 		return
 	}
 
 	token, err := h.userService.Authenticate(req.Email, req.Password)
 	if err != nil {
 		logging.Error("Erro na autenticação: %v", err)
-		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
+		errors.HandleError(w, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	errors.RespondWithJSON(w, http.StatusOK, map[string]string{
 		"token": token,
 	})
 }
@@ -93,17 +103,16 @@ func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	// O middleware de autenticação adiciona o ID do usuário no contexto
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		http.Error(w, "Não autorizado", http.StatusUnauthorized)
+		errors.HandleError(w, errors.ErrUnauthorized)
 		return
 	}
 
 	user, err := h.userService.GetByID(userID.(string))
 	if err != nil {
 		logging.Error("Erro ao buscar usuário: %v", err)
-		http.Error(w, "Erro ao buscar dados do usuário", http.StatusInternalServerError)
+		errors.HandleError(w, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	errors.RespondWithJSON(w, http.StatusOK, user)
 }
