@@ -19,6 +19,7 @@ go.work
 
 # Environment variables
 .env
+configs/app.env
 
 # Prisma generated files
 prisma/db
