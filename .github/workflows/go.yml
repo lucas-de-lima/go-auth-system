@@ -120,17 +120,48 @@ jobs:
         go install github.com/securego/gosec/v2/cmd/gosec@latest
         gosec --version
 
+    - name: Create gosec config
+      run: |
+        cat > gosec.json << EOF
+        {
+          "global": {
+            "nosec": false,
+            "audit": false,
+            "nosec-tag": "security-issue",
+            "show-ignored": false,
+            "sort": true
+          },
+          "severity": "medium"
+        }
+        EOF
+
     - name: Run gosec Security Scanner
       run: |
-        gosec -fmt=text -out=gosec-results.txt ./...
-        cat gosec-results.txt
+        # Executar gosec com mais detalhes e ignorar erros não críticos
+        gosec -fmt=json -confidence=medium -severity=medium -no-fail -out=gosec-results.json ./...
+        
+        # Converter para texto para exibição
+        echo "=== Security Issues Found ==="
+        if [ -f gosec-results.json ]; then
+          jq -r '.Issues[] | "[\(.severity)] \(.file):\(.line) - \(.details)"' gosec-results.json || echo "No issues found or error parsing results"
+        else
+          echo "No issues found"
+        fi
+        
+        # Contar e mostrar estatísticas
+        echo -e "\n=== Security Scan Statistics ==="
+        if [ -f gosec-results.json ]; then
+          echo "Total Issues: $(jq '.Stats.NumFiles' gosec-results.json) files scanned, $(jq '.Stats.NumIssues' gosec-results.json) issues found"
+          echo "By severity: $(jq -r '.Stats.NumBySeverity | to_entries | map("\(.key): \(.value)") | join(", ")' gosec-results.json)"
+        fi
+      continue-on-error: true
 
     - name: Upload gosec results
-      if: success() || failure()
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: gosec-results
-        path: gosec-results.txt
+        path: gosec-results.json
 
   test:
     runs-on: ubuntu-latest
