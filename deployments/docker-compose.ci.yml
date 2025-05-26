@@ -20,10 +20,16 @@ services:
       - GOCACHE=/tmp/.cache
     command: >
       sh -c "
+        ls -la /usr/local/bin/ &&
+        echo 'Verificando script wait-for-db.sh...' &&
+        cat /usr/local/bin/wait-for-db.sh &&
+        echo 'Aguardando postgres...' &&
         wait-for-db.sh postgres:5432 &&
+        echo 'Postgres disponível, iniciando migrações...' &&
         cd prisma &&
         go run cmd/run_prisma.go migrate deploy &&
         cd .. &&
+        echo 'Executando testes...' &&
         go test -v -timeout=5m -coverprofile=/tmp/coverage.out ./... &&
         go tool cover -func=/tmp/coverage.out"
 
