@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.ci
+      target: test
+    container_name: go-auth-test
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/auth_system?sslmode=disable
+      - JWT_SECRET=test_jwt_secret
+      - JWT_REFRESH_SECRET=test_refresh_secret
+      - GO_ENV=test
+      - GOCACHE=/tmp/.cache
+    command: >
+      sh -c "
+        wait-for-db.sh postgres:5432 &&
+        cd prisma &&
+        go run cmd/run_prisma.go migrate deploy &&
+        cd .. &&
+        go test -v -timeout=5m -coverprofile=/tmp/coverage.out ./... &&
+        go tool cover -func=/tmp/coverage.out"
+
+  postgres:
+    image: postgres:14-alpine
+    container_name: postgres-test
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=auth_system
+    # Não usamos volumes persistentes no CI para garantir um ambiente limpo
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5 
