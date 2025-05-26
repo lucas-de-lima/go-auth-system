@@ -1,0 +1,63 @@
+FROM golang:1.24.3-alpine AS base
+
+WORKDIR /app
+
+# Instalar dependências necessárias
+RUN apk add --no-cache git postgresql-client
+
+# Copiar apenas os arquivos de dependências primeiro para aproveitar o cache do Docker
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Estágio específico para geração do cliente Prisma
+FROM base AS prisma-generator
+WORKDIR /app
+
+# Copiar apenas os arquivos necessários para geração do cliente Prisma
+COPY prisma/schema.prisma prisma/
+COPY prisma/cmd/ prisma/cmd/
+COPY configs/ configs/
+
+# Gerar o cliente Prisma
+RUN cd prisma && go run cmd/run_prisma.go generate
+
+# Estágio de build para testes
+FROM base AS builder-test
+WORKDIR /app
+
+# Copiar o cliente Prisma gerado
+COPY --from=prisma-generator /app/prisma/db/ /app/prisma/db/
+COPY . .
+
+# Estágio de build para produção
+FROM base AS builder-prod
+WORKDIR /app
+
+# Copiar o cliente Prisma gerado
+COPY --from=prisma-generator /app/prisma/db/ /app/prisma/db/
+COPY . .
+
+# Compilar a aplicação
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o goapp ./cmd/api
+
+# Estágio para testes
+FROM alpine:latest AS test
+RUN apk add --no-cache ca-certificates postgresql-client
+
+WORKDIR /app
+COPY --from=builder-test /app/ ./
+COPY scripts/wait-for-db.sh /usr/local/bin/wait-for-db.sh
+RUN chmod +x /usr/local/bin/wait-for-db.sh
+
+# Imagem final para produção
+FROM alpine:latest AS production
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /root/
+
+COPY --from=builder-prod /app/goapp .
+COPY --from=builder-prod /app/configs ./configs
+
+EXPOSE 8080
+
+CMD ["./goapp"] 

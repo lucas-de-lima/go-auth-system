@@ -1,4 +1,4 @@
-.PHONY: build run test clean docker-build docker-run migrate-up migrate-down prisma-generate
+.PHONY: build run test clean docker-build docker-run migrate-up migrate-down prisma-generate prisma-db-push prisma-migrate prisma-studio
 
 # Variáveis
 APP_NAME := go-auth-system
@@ -35,7 +35,21 @@ docker-compose-down:
 
 # Comandos para Prisma
 prisma-generate:
-	cd prisma && go run github.com/steebchen/prisma-client-go generate
+	cd prisma && go run cmd/run_prisma.go generate
+
+prisma-db-push:
+	cd prisma && go run cmd/run_prisma.go db push
+
+prisma-migrate-dev:
+	cd prisma && go run cmd/run_prisma.go migrate dev --name $(name)
+
+prisma-migrate-deploy:
+	cd prisma && go run cmd/run_prisma.go migrate deploy
+
+prisma-studio:
+	cd prisma && go run cmd/run_prisma.go studio
+
+prisma-setup: prisma-generate prisma-db-push
 
 # Outros comandos úteis
 lint:
@@ -55,5 +69,10 @@ help:
 	@echo "  make docker-compose-up  - Inicia todos os serviços com Docker Compose"
 	@echo "  make docker-compose-down- Para todos os serviços do Docker Compose"
 	@echo "  make prisma-generate    - Gera código do cliente Prisma"
+	@echo "  make prisma-db-push     - Atualiza o banco de dados conforme o schema (desenvolvimento)"
+	@echo "  make prisma-migrate-dev - Cria uma nova migração (use make prisma-migrate-dev name=nome_da_migracao)"
+	@echo "  make prisma-migrate-deploy - Aplica migrações em ambientes de produção"
+	@echo "  make prisma-studio      - Abre o Prisma Studio para visualizar o banco de dados"
+	@echo "  make prisma-setup       - Configura o banco de dados (gera o cliente e cria tabelas)"
 	@echo "  make lint               - Executa linter"
 	@echo "  make tidy               - Atualiza dependências" 

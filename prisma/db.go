@@ -14,14 +14,14 @@ var DB *db.PrismaClient
 func Init() {
 	DB = db.NewClient()
 
-	if err := DB.Connect(); err != nil {
+	if err := DB.Prisma.Connect(); err != nil {
 		log.Fatalf("Erro ao conectar ao banco de dados: %v", err)
 	}
 }
 
 // Disconnect fecha a conexão com o banco de dados
 func Disconnect() {
-	if err := DB.Disconnect(); err != nil {
+	if err := DB.Prisma.Disconnect(); err != nil {
 		log.Printf("Erro ao desconectar do banco de dados: %v", err)
 	}
 }

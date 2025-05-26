@@ -8,23 +8,23 @@ import (
 	"github.com/google/uuid"
 	"github.com/lucas-de-lima/go-auth-system/internal/domain"
 	"github.com/lucas-de-lima/go-auth-system/pkg/logging"
-	"github.com/lucas-de-lima/go-auth-system/prisma"
+	"github.com/lucas-de-lima/go-auth-system/prisma/db"
 )
 
 // UserRepository implementa a interface domain.UserRepository
 type UserRepository struct {
-	db *prisma.DB
+	db *db.PrismaClient
 }
 
 // NewUserRepository cria uma nova instância do repositório de usuário
-func NewUserRepository(db *prisma.DB) *UserRepository {
+func NewUserRepository(db *db.PrismaClient) *UserRepository {
 	return &UserRepository{
 		db: db,
 	}
 }
 
 // Create cria um novo usuário no banco de dados
-func (r *UserRepository) Create(user *domain.User) error {
+func (ur *UserRepository) Create(user *domain.User) error {
 	ctx := context.Background()
 
 	// Gera um novo UUID se não for fornecido
@@ -33,13 +33,13 @@ func (r *UserRepository) Create(user *domain.User) error {
 	}
 
 	// Cria o usuário no Prisma
-	_, err := r.db.DB.User.CreateOne(
-		prisma.User.ID.Set(user.ID),
-		prisma.User.Email.Set(user.Email),
-		prisma.User.Password.Set(user.Password),
-		prisma.User.Name.Set(user.Name),
-		prisma.User.CreatedAt.Set(user.CreatedAt),
-		prisma.User.UpdatedAt.Set(user.UpdatedAt),
+	_, err := ur.db.User.CreateOne(
+		db.User.Email.Set(user.Email),
+		db.User.Password.Set(user.Password),
+		db.User.ID.Set(user.ID),
+		db.User.Name.Set(user.Name),
+		db.User.CreatedAt.Set(user.CreatedAt),
+		db.User.UpdatedAt.Set(user.UpdatedAt),
 	).Exec(ctx)
 
 	if err != nil {
@@ -51,15 +51,15 @@ func (r *UserRepository) Create(user *domain.User) error {
 }
 
 // GetByID busca um usuário pelo ID
-func (r *UserRepository) GetByID(id string) (*domain.User, error) {
+func (ur *UserRepository) GetByID(id string) (*domain.User, error) {
 	ctx := context.Background()
 
-	prismaUser, err := r.db.DB.User.FindUnique(
-		prisma.User.ID.Equals(id),
+	prismaUser, err := ur.db.User.FindUnique(
+		db.User.ID.Equals(id),
 	).Exec(ctx)
 
 	if err != nil {
-		if errors.Is(err, prisma.ErrNotFound) {
+		if errors.Is(err, db.ErrNotFound) {
 			return nil, nil
 		}
 		logging.Error("Erro ao buscar usuário por ID: %v", err)
@@ -70,15 +70,15 @@ func (r *UserRepository) GetByID(id string) (*domain.User, error) {
 }
 
 // GetByEmail busca um usuário pelo email
-func (r *UserRepository) GetByEmail(email string) (*domain.User, error) {
+func (ur *UserRepository) GetByEmail(email string) (*domain.User, error) {
 	ctx := context.Background()
 
-	prismaUser, err := r.db.DB.User.FindUnique(
-		prisma.User.Email.Equals(email),
+	prismaUser, err := ur.db.User.FindUnique(
+		db.User.Email.Equals(email),
 	).Exec(ctx)
 
 	if err != nil {
-		if errors.Is(err, prisma.ErrNotFound) {
+		if errors.Is(err, db.ErrNotFound) {
 			return nil, nil
 		}
 		logging.Error("Erro ao buscar usuário por email: %v", err)
@@ -89,16 +89,16 @@ func (r *UserRepository) GetByEmail(email string) (*domain.User, error) {
 }
 
 // Update atualiza os dados de um usuário
-func (r *UserRepository) Update(user *domain.User) error {
+func (ur *UserRepository) Update(user *domain.User) error {
 	ctx := context.Background()
 
-	_, err := r.db.DB.User.FindUnique(
-		prisma.User.ID.Equals(user.ID),
+	_, err := ur.db.User.FindUnique(
+		db.User.ID.Equals(user.ID),
 	).Update(
-		prisma.User.Email.Set(user.Email),
-		prisma.User.Password.Set(user.Password),
-		prisma.User.Name.Set(user.Name),
-		prisma.User.UpdatedAt.Set(time.Now()),
+		db.User.Email.Set(user.Email),
+		db.User.Password.Set(user.Password),
+		db.User.Name.Set(user.Name),
+		db.User.UpdatedAt.Set(time.Now()),
 	).Exec(ctx)
 
 	if err != nil {
@@ -110,11 +110,11 @@ func (r *UserRepository) Update(user *domain.User) error {
 }
 
 // Delete remove um usuário pelo ID
-func (r *UserRepository) Delete(id string) error {
+func (ur *UserRepository) Delete(id string) error {
 	ctx := context.Background()
 
-	_, err := r.db.DB.User.FindUnique(
-		prisma.User.ID.Equals(id),
+	_, err := ur.db.User.FindUnique(
+		db.User.ID.Equals(id),
 	).Delete().Exec(ctx)
 
 	if err != nil {
@@ -126,16 +126,21 @@ func (r *UserRepository) Delete(id string) error {
 }
 
 // mapPrismaUserToDomain converte um model Prisma para o modelo de domínio
-func mapPrismaUserToDomain(prismaUser *prisma.UserModel) *domain.User {
+func mapPrismaUserToDomain(prismaUser *db.UserModel) *domain.User {
 	if prismaUser == nil {
 		return nil
+	}
+
+	name := ""
+	if prismaUser.InnerUser.Name != nil {
+		name = *prismaUser.InnerUser.Name
 	}
 
 	return &domain.User{
 		ID:        prismaUser.ID,
 		Email:     prismaUser.Email,
 		Password:  prismaUser.Password,
-		Name:      prismaUser.Name,
+		Name:      name,
 		CreatedAt: prismaUser.CreatedAt,
 		UpdatedAt: prismaUser.UpdatedAt,
 	}
