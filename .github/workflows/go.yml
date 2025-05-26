@@ -30,7 +30,7 @@ jobs:
         go run cmd/run_prisma.go generate
 
     - name: Cache Prisma Client
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: prisma/db
         key: ${{ runner.os }}-prisma-${{ github.sha }}
@@ -48,7 +48,7 @@ jobs:
         cache: true
 
     - name: Restore Prisma Client
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: prisma/db
         key: ${{ runner.os }}-prisma-${{ github.sha }}
@@ -103,7 +103,7 @@ jobs:
         cache: true
 
     - name: Restore Prisma Client
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: prisma/db
         key: ${{ runner.os }}-prisma-${{ github.sha }}
@@ -127,7 +127,7 @@ jobs:
 
     - name: Upload gosec results
       if: success() || failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: gosec-results
         path: gosec-results.txt
@@ -145,7 +145,7 @@ jobs:
         buildkitd-flags: --debug
 
     - name: Cache Docker layers
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: /tmp/.buildx-cache
         key: ${{ runner.os }}-buildx-${{ github.sha }}
@@ -166,7 +166,7 @@ jobs:
         
     - name: Upload relatório de cobertura
       if: success() && hashFiles('./coverage.out') != ''
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-report
         path: coverage.out
@@ -181,7 +181,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
 
     - name: Cache Docker layers
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: /tmp/.buildx-cache
         key: ${{ runner.os }}-buildx-${{ github.sha }}

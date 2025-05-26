@@ -41,15 +41,16 @@ Script auxiliar que:
 Workflow do GitHub Actions melhorado com:
 
 - **Etapa dedicada para geração do cliente Prisma** antes de outras etapas
-- Cache do cliente Prisma gerado entre jobs
+- Cache do cliente Prisma gerado entre jobs (usando actions/cache@v4)
 - Formatação automática do código (go fmt) antes do linting
 - Configuração personalizada do golangci-lint para controle fino de linting
 - Instalação e execução direta do gosec com a versão correta do Go
 - Cache otimizado para camadas Docker
-- Extração e upload de relatórios de cobertura de testes
+- Extração e upload de relatórios (usando actions/upload-artifact@v4)
 - Timeout global para evitar builds presos
 - Limpeza adequada de recursos após os testes
 - Versão específica do Go (1.24.3) para compatibilidade com o projeto
+- Uso das versões mais recentes das ações do GitHub Actions para compatibilidade
 
 ## Como Funciona
 
@@ -100,6 +101,7 @@ docker-compose -f deployments/docker-compose.ci.yml down -v
 - Timeouts configurados para evitar builds presos
 - Limpeza adequada de recursos após os testes
 - Verificação de existência do cliente Prisma antes de cada etapa
+- Uso das versões mais recentes das ações do GitHub Actions
 
 ### 3. Qualidade de Código
 
@@ -143,6 +145,13 @@ Os erros como `Error return value of w.Write is not checked (errcheck)` e `File 
 2. Formatação automática do código antes do linting
 3. Configuração personalizada do golangci-lint para regras específicas
 4. Exclusão de regras em contextos específicos (como testes)
+
+### Problema: Compatibilidade de ações do GitHub Actions
+
+Os erros como `Missing download info for actions/upload-artifact@v3` foram resolvidos com:
+
+1. Atualização para as versões mais recentes das ações (v4)
+2. Garantia de compatibilidade entre as diferentes ações usadas no workflow
 
 ### Problema: Banco de dados não disponível
 
