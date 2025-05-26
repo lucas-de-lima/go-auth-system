@@ -24,7 +24,7 @@ func NewUserRepository(db *db.PrismaClient) *UserRepository {
 }
 
 // Create cria um novo usuário no banco de dados
-func (r *UserRepository) Create(user *domain.User) error {
+func (ur *UserRepository) Create(user *domain.User) error {
 	ctx := context.Background()
 
 	// Gera um novo UUID se não for fornecido
@@ -33,7 +33,7 @@ func (r *UserRepository) Create(user *domain.User) error {
 	}
 
 	// Cria o usuário no Prisma
-	_, err := r.db.User.CreateOne(
+	_, err := ur.db.User.CreateOne(
 		db.User.Email.Set(user.Email),
 		db.User.Password.Set(user.Password),
 		db.User.ID.Set(user.ID),
@@ -51,10 +51,10 @@ func (r *UserRepository) Create(user *domain.User) error {
 }
 
 // GetByID busca um usuário pelo ID
-func (r *UserRepository) GetByID(id string) (*domain.User, error) {
+func (ur *UserRepository) GetByID(id string) (*domain.User, error) {
 	ctx := context.Background()
 
-	prismaUser, err := r.db.User.FindUnique(
+	prismaUser, err := ur.db.User.FindUnique(
 		db.User.ID.Equals(id),
 	).Exec(ctx)
 
@@ -70,10 +70,10 @@ func (r *UserRepository) GetByID(id string) (*domain.User, error) {
 }
 
 // GetByEmail busca um usuário pelo email
-func (r *UserRepository) GetByEmail(email string) (*domain.User, error) {
+func (ur *UserRepository) GetByEmail(email string) (*domain.User, error) {
 	ctx := context.Background()
 
-	prismaUser, err := r.db.User.FindUnique(
+	prismaUser, err := ur.db.User.FindUnique(
 		db.User.Email.Equals(email),
 	).Exec(ctx)
 
@@ -89,10 +89,10 @@ func (r *UserRepository) GetByEmail(email string) (*domain.User, error) {
 }
 
 // Update atualiza os dados de um usuário
-func (r *UserRepository) Update(user *domain.User) error {
+func (ur *UserRepository) Update(user *domain.User) error {
 	ctx := context.Background()
 
-	_, err := r.db.User.FindUnique(
+	_, err := ur.db.User.FindUnique(
 		db.User.ID.Equals(user.ID),
 	).Update(
 		db.User.Email.Set(user.Email),
@@ -110,10 +110,10 @@ func (r *UserRepository) Update(user *domain.User) error {
 }
 
 // Delete remove um usuário pelo ID
-func (r *UserRepository) Delete(id string) error {
+func (ur *UserRepository) Delete(id string) error {
 	ctx := context.Background()
 
-	_, err := r.db.User.FindUnique(
+	_, err := ur.db.User.FindUnique(
 		db.User.ID.Equals(id),
 	).Delete().Exec(ctx)
 

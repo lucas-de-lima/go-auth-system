@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/lucas-de-lima/go-auth-system/internal/auth"
+	"github.com/lucas-de-lima/go-auth-system/pkg/errors"
 	"github.com/lucas-de-lima/go-auth-system/pkg/logging"
 )
 
@@ -35,14 +37,14 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "Não autorizado: token não fornecido", http.StatusUnauthorized)
+			errors.HandleError(w, errors.ErrMissingToken)
 			return
 		}
 
 		// Extrai o token do cabeçalho (formato: "Bearer <token>")
 		tokenParts := strings.Split(authHeader, " ")
 		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			http.Error(w, "Formato de autorização inválido", http.StatusUnauthorized)
+			errors.HandleError(w, errors.ErrBadRequest.WithMessage("Formato de autorização inválido"))
 			return
 		}
 
@@ -50,7 +52,7 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		claims, err := m.jwtService.ValidateToken(token)
 		if err != nil {
 			logging.Error("Token inválido: %v", err)
-			http.Error(w, "Não autorizado: token inválido", http.StatusUnauthorized)
+			errors.HandleError(w, errors.ErrInvalidToken.WithError(err))
 			return
 		}
 
@@ -61,6 +63,42 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		// Continua para o próximo handler com o contexto atualizado
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// GinAuthenticate é um middleware de autenticação para o Gin
+func (m *AuthMiddleware) GinAuthenticate() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			errors.GinHandleError(c, errors.ErrMissingToken)
+			c.Abort()
+			return
+		}
+
+		// Extrai o token do cabeçalho (formato: "Bearer <token>")
+		tokenParts := strings.Split(authHeader, " ")
+		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+			errors.GinHandleError(c, errors.ErrBadRequest.WithMessage("Formato de autorização inválido"))
+			c.Abort()
+			return
+		}
+
+		token := tokenParts[1]
+		claims, err := m.jwtService.ValidateToken(token)
+		if err != nil {
+			logging.Error("Token inválido: %v", err)
+			errors.GinHandleError(c, errors.ErrInvalidToken.WithError(err))
+			c.Abort()
+			return
+		}
+
+		// Adiciona informações do usuário ao contexto
+		c.Set("user_id", claims.UserID)
+		c.Set("user_email", claims.Email)
+
+		// Continua para o próximo handler
+		c.Next()
+	}
 }
 
 // RequireRole verifica se o usuário tem um papel específico
@@ -79,4 +117,26 @@ func (m *AuthMiddleware) RequireRole(role string, next http.Handler) http.Handle
 		// Continua para o próximo handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+// GinRequireRole verifica se o usuário tem um papel específico (versão Gin)
+func (m *AuthMiddleware) GinRequireRole(role string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Aqui você pode implementar a verificação de papéis/permissões
+		// Por exemplo, buscar o usuário no banco de dados e verificar seus papéis
+
+		// Por enquanto, apenas verificamos se o usuário está autenticado
+		userID, exists := c.Get("user_id")
+		if !exists {
+			errors.GinHandleError(c, errors.ErrUnauthorized)
+			c.Abort()
+			return
+		}
+
+		// Aqui você poderia verificar se o usuário tem o papel necessário
+		logging.Info("Usuário %v está acessando recurso protegido com papel %s", userID, role)
+
+		// Continua para o próximo handler
+		c.Next()
+	}
 }
