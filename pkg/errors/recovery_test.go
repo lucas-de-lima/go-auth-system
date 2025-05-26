@@ -45,7 +45,10 @@ func TestWithRecovery_NoRecovery(t *testing.T) {
 	// Handler normal sem pânico
 	normalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, err := w.Write([]byte("OK"))
+		if err != nil {
+			t.Fatalf("Erro ao escrever resposta: %v", err)
+		}
 	})
 
 	// Aplicando o middleware de recuperação

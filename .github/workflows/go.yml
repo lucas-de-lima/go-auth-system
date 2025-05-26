@@ -60,6 +60,24 @@ jobs:
           cd prisma && go run cmd/run_prisma.go generate
         fi
 
+    - name: Create golangci-lint config
+      run: |
+        cat > .golangci.yml << EOF
+        linters:
+          enable:
+            - errcheck
+            - ineffassign
+            - gofmt
+            - govet
+            - staticcheck
+        
+        issues:
+          exclude-rules:
+            - path: _test\.go
+              linters:
+                - errcheck
+        EOF
+
     - name: Lint
       uses: golangci/golangci-lint-action@v3
       with:
@@ -79,6 +97,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        cache: true
 
     - name: Restore Prisma Client
       uses: actions/cache@v3
@@ -96,7 +115,7 @@ jobs:
     - name: Run gosec Security Scanner
       uses: securego/gosec@master
       with:
-        args: ./...
+        args: -go=1.24.3 ./...
 
   test:
     runs-on: ubuntu-latest

@@ -30,8 +30,8 @@ func main() {
 	}
 
 	// Tenta carregar o arquivo de configuração de cada localização possível
-	configLoaded := false
 	var loadedPath string
+	configLoaded := false
 
 	for _, path := range configPaths {
 		absPath, _ := filepath.Abs(path)
@@ -62,8 +62,8 @@ func main() {
 			log.Printf("🔎 Arquivo de configuração encontrado em: %s", foundPath)
 			if err := godotenv.Load(foundPath); err == nil {
 				log.Printf("✅ Configurações carregadas com sucesso de: %s", foundPath)
-				configLoaded = true
 				loadedPath = foundPath
+				// Não precisamos atualizar configLoaded aqui, pois não é usado após este ponto
 			} else {
 				log.Printf("❌ Erro ao carregar o arquivo %s: %v", foundPath, err)
 			}
@@ -82,7 +82,9 @@ func main() {
 		log.Printf("⚠️ Usando URL de banco de dados padrão: %s", defaultDbUrl)
 	} else {
 		log.Printf("✅ Usando DATABASE_URL do arquivo de configuração: %s", dbUrl)
-		log.Printf("✅ Carregado de: %s", loadedPath)
+		if loadedPath != "" {
+			log.Printf("✅ Carregado de: %s", loadedPath)
+		}
 	}
 
 	// Obter os argumentos para o comando Prisma

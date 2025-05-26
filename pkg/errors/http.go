@@ -56,7 +56,10 @@ func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	w.Write(response)
+	_, err = w.Write(response)
+	if err != nil {
+		logging.Error("Erro ao escrever resposta: %v", err)
+	}
 }
 
 // WithRecovery é um middleware que recupera de pânicos
