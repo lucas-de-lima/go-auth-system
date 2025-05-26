@@ -63,4 +63,3 @@ func (u *UserRequest) FromUserRequest() *User {
 		Password: u.Password,
 	}
 }
-

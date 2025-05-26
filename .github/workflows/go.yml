@@ -60,6 +60,9 @@ jobs:
           cd prisma && go run cmd/run_prisma.go generate
         fi
 
+    - name: Format code
+      run: go fmt ./...
+
     - name: Create golangci-lint config
       run: |
         cat > .golangci.yml << EOF
@@ -115,7 +118,7 @@ jobs:
     - name: Run gosec Security Scanner
       uses: securego/gosec@master
       with:
-        args: -go=1.24.3 ./...
+        args: ./...
 
   test:
     runs-on: ubuntu-latest

@@ -42,8 +42,9 @@ Workflow do GitHub Actions melhorado com:
 
 - **Etapa dedicada para geração do cliente Prisma** antes de outras etapas
 - Cache do cliente Prisma gerado entre jobs
+- Formatação automática do código (go fmt) antes do linting
 - Configuração personalizada do golangci-lint para controle fino de linting
-- Verificação de segurança com gosec usando a versão correta do Go
+- Verificação de segurança com gosec
 - Cache otimizado para camadas Docker
 - Extração e upload de relatórios de cobertura de testes
 - Timeout global para evitar builds presos
@@ -53,7 +54,10 @@ Workflow do GitHub Actions melhorado com:
 ## Como Funciona
 
 1. **Geração do cliente Prisma**: Uma etapa dedicada gera o cliente Prisma e o armazena em cache
-2. **Verificação de código**: Linting com configuração personalizada e análise de segurança usando o cliente Prisma em cache
+2. **Verificação de código**: 
+   - Formatação automática do código
+   - Linting com configuração personalizada
+   - Análise de segurança usando o cliente Prisma em cache
 3. **Execução de testes**:
    - O PostgreSQL é iniciado com healthcheck e otimizações
    - As migrações do Prisma são aplicadas
@@ -66,6 +70,9 @@ Workflow do GitHub Actions melhorado com:
 Para executar o mesmo ambiente de CI localmente:
 
 ```bash
+# Formatar o código
+go fmt ./...
+
 # Executar os testes
 docker-compose -f deployments/docker-compose.ci.yml up --build
 
@@ -92,9 +99,10 @@ docker-compose -f deployments/docker-compose.ci.yml down -v
 
 ### 3. Qualidade de Código
 
+- Formatação automática do código antes do linting
 - Linting com golangci-lint após geração do cliente Prisma
 - Configuração personalizada de linting para controle fino de regras
-- Verificação de segurança com gosec usando a versão correta do Go
+- Verificação de segurança com gosec
 - Geração de relatórios de cobertura de testes
 - Verificação de dependências
 - Correção de erros comuns como verificação de valores de retorno
@@ -121,15 +129,15 @@ O erro `go.mod requires go >= 1.24.3 (running go 1.24.2)` foi resolvido com:
 
 1. Especificação explícita da versão Go 1.24.3 em todos os ambientes
 2. Uso da mesma versão no Dockerfile.ci e no workflow do GitHub Actions
-3. Parâmetro `-go=1.24.3` para o gosec
 
 ### Problema: Erros de linting
 
-Os erros como `Error return value of w.Write is not checked (errcheck)` foram resolvidos com:
+Os erros como `Error return value of w.Write is not checked (errcheck)` e `File is not properly formatted (gofmt)` foram resolvidos com:
 
 1. Verificação adequada dos valores de retorno de funções importantes
-2. Configuração personalizada do golangci-lint para regras específicas
-3. Exclusão de regras em contextos específicos (como testes)
+2. Formatação automática do código antes do linting
+3. Configuração personalizada do golangci-lint para regras específicas
+4. Exclusão de regras em contextos específicos (como testes)
 
 ### Problema: Banco de dados não disponível
 
