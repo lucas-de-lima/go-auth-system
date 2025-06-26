@@ -14,7 +14,6 @@ import (
 	"github.com/lucas-de-lima/go-auth-system/internal/controller/user"
 	"github.com/lucas-de-lima/go-auth-system/internal/domain"
 	"github.com/lucas-de-lima/go-auth-system/internal/service"
-	"github.com/lucas-de-lima/go-auth-system/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -78,7 +77,6 @@ func (r *InMemoryUserRepository) Create(user *domain.User) error {
 		user.ID = uuid.New().String()
 	}
 	r.users[user.ID] = user
-	logging.Info("DEBUG: Usuário criado com name: %s", user.Name)
 	return nil
 }
 
