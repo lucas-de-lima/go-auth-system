@@ -100,3 +100,8 @@ func (s *JWTService) ValidateRefreshToken(tokenString string) (*jwt.RegisteredCl
 
 	return nil, errors.New("refresh token inválido")
 }
+
+// GetRefreshKey retorna a chave de refresh (uso exclusivo para testes)
+func (s *JWTService) GetRefreshKey() string {
+	return s.refreshKey
+}

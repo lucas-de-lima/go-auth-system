@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/lucas-de-lima/go-auth-system/internal/auth"
 	"github.com/lucas-de-lima/go-auth-system/internal/controller/user"
@@ -634,4 +635,164 @@ func TestUserCRUD(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
+}
+
+// TestUserValidation testa validações de segurança no registro de usuário
+func TestUserValidation(t *testing.T) {
+	router, _ := setupTestEnvironment()
+
+	t.Run("should fail with short password", func(t *testing.T) {
+		userData := map[string]interface{}{
+			"email":    "shortpass@example.com",
+			"password": "12",
+			"name":     "Short Pass",
+		}
+		jsonData, _ := json.Marshal(userData)
+
+		req := httptest.NewRequest("POST", "/users/register", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("should fail with empty password", func(t *testing.T) {
+		userData := map[string]interface{}{
+			"email":    "emptypass@example.com",
+			"password": "",
+			"name":     "Empty Pass",
+		}
+		jsonData, _ := json.Marshal(userData)
+
+		req := httptest.NewRequest("POST", "/users/register", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("should fail with empty email", func(t *testing.T) {
+		userData := map[string]interface{}{
+			"email":    "",
+			"password": "password123",
+			"name":     "Empty Email",
+		}
+		jsonData, _ := json.Marshal(userData)
+
+		req := httptest.NewRequest("POST", "/users/register", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("should fail with invalid email format", func(t *testing.T) {
+		userData := map[string]interface{}{
+			"email":    "invalid-email",
+			"password": "password123",
+			"name":     "Invalid Email",
+		}
+		jsonData, _ := json.Marshal(userData)
+
+		req := httptest.NewRequest("POST", "/users/register", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("should fail with duplicate email", func(t *testing.T) {
+		userData := map[string]interface{}{
+			"email":    "duplicate@example.com",
+			"password": "password123",
+			"name":     "First User",
+		}
+		jsonData, _ := json.Marshal(userData)
+
+		req := httptest.NewRequest("POST", "/users/register", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusCreated, w.Code)
+
+		// Tentar registrar novamente com o mesmo email
+		userData2 := map[string]interface{}{
+			"email":    "duplicate@example.com",
+			"password": "password123",
+			"name":     "Second User",
+		}
+		jsonData2, _ := json.Marshal(userData2)
+
+		req2 := httptest.NewRequest("POST", "/users/register", bytes.NewBuffer(jsonData2))
+		req2.Header.Set("Content-Type", "application/json")
+		w2 := httptest.NewRecorder()
+		router.ServeHTTP(w2, req2)
+		assert.Equal(t, http.StatusConflict, w2.Code)
+	})
+}
+
+// TestRefreshTokenInvalidCases testa casos de refresh token expirado e malformado
+func TestRefreshTokenInvalidCases(t *testing.T) {
+	router, userService := setupTestEnvironment()
+
+	// Criar usuário e obter JWTService
+	testUser := &domain.User{
+		Email:    "tokeninvalid@example.com",
+		Password: "password123",
+		Name:     "Token Invalid",
+	}
+	err := userService.Create(testUser)
+	require.NoError(t, err)
+
+	jwtService := userService.GetJWTService()
+
+	t.Run("should fail with malformatted refresh token", func(t *testing.T) {
+		refreshData := map[string]interface{}{
+			"refresh_token": "malformed.token.value",
+		}
+		jsonData, _ := json.Marshal(refreshData)
+
+		req := httptest.NewRequest("POST", "/users/refresh", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("should fail with expired refresh token", func(t *testing.T) {
+		// Gerar um refresh token com expiração curta (1 segundo)
+		shortLivedToken, err := generateShortLivedRefreshToken(jwtService, testUser.ID, 1)
+		require.NoError(t, err)
+
+		// Esperar expirar
+		time.Sleep(2 * time.Second)
+
+		refreshData := map[string]interface{}{
+			"refresh_token": shortLivedToken,
+		}
+		jsonData, _ := json.Marshal(refreshData)
+
+		req := httptest.NewRequest("POST", "/users/refresh", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}
+
+// generateShortLivedRefreshToken gera um refresh token com expiração customizada
+func generateShortLivedRefreshToken(jwtService *auth.JWTService, userID string, seconds int) (string, error) {
+	expirationTime := time.Now().Add(time.Second * time.Duration(seconds))
+	claims := jwt.MapClaims{
+		"exp": expirationTime.Unix(),
+		"sub": userID,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(jwtService.GetRefreshKey()))
 }

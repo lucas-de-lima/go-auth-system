@@ -218,3 +218,8 @@ func BlacklistRefreshToken(token string) {
 func ClearRefreshTokenBlacklist() {
 	refreshTokenBlacklist = make(map[string]struct{})
 }
+
+// GetJWTService retorna o ponteiro do JWTService (uso exclusivo para testes)
+func (us *UserService) GetJWTService() *auth.JWTService {
+	return us.jwtService
+}
