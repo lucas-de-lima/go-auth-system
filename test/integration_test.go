@@ -50,6 +50,11 @@ func setupTestEnvironment() (*gin.Engine, *service.UserService) {
 	router.POST("/users/logout", userController.Logout)
 	router.POST("/users/refresh", userController.RefreshToken)
 
+	// Rotas CRUD
+	router.GET("/users/:id", userController.GetByID)
+	router.PUT("/users/:id", userController.Update)
+	router.DELETE("/users/:id", userController.Delete)
+
 	return router, userService
 }
 
@@ -446,5 +451,187 @@ func TestLogout(t *testing.T) {
 		router.ServeHTTP(w2, req2)
 
 		assert.Equal(t, http.StatusUnauthorized, w2.Code)
+	})
+}
+
+// TestUserCRUD testa as operações CRUD de usuário
+func TestUserCRUD(t *testing.T) {
+	router, userService := setupTestEnvironment()
+
+	// Criar usuário para teste
+	testUser := &domain.User{
+		Email:    "crud@example.com",
+		Password: "password123",
+		Name:     "CRUD User",
+	}
+	err := userService.Create(testUser)
+	require.NoError(t, err)
+
+	var userID string
+
+	t.Run("should get user by ID successfully", func(t *testing.T) {
+		// Buscar o usuário criado para obter o ID
+		user, err := userService.GetByEmail("crud@example.com")
+		require.NoError(t, err)
+		userID = user.ID
+
+		// Act
+		req := httptest.NewRequest("GET", "/users/"+userID, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "crud@example.com", response["email"])
+		assert.Equal(t, "CRUD User", response["name"])
+		assert.Equal(t, userID, response["id"])
+		assert.NotEmpty(t, response["created_at"])
+		assert.NotEmpty(t, response["updated_at"])
+		// Senha não deve estar na resposta
+		assert.Nil(t, response["password"])
+	})
+
+	t.Run("should fail to get user with invalid ID", func(t *testing.T) {
+		// Act
+		req := httptest.NewRequest("GET", "/users/invalid-id", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("should update user successfully", func(t *testing.T) {
+		// Arrange
+		updateData := map[string]interface{}{
+			"name":  "Updated CRUD User",
+			"email": "updated.crud@example.com",
+		}
+		jsonData, _ := json.Marshal(updateData)
+
+		// Act
+		req := httptest.NewRequest("PUT", "/users/"+userID, bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "updated.crud@example.com", response["email"])
+		assert.Equal(t, "Updated CRUD User", response["name"])
+		assert.Equal(t, userID, response["id"])
+	})
+
+	t.Run("should update only name when only name is provided", func(t *testing.T) {
+		// Arrange
+		updateData := map[string]interface{}{
+			"name": "Only Name Updated",
+		}
+		jsonData, _ := json.Marshal(updateData)
+
+		// Act
+		req := httptest.NewRequest("PUT", "/users/"+userID, bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "updated.crud@example.com", response["email"]) // Email não deve ter mudado
+		assert.Equal(t, "Only Name Updated", response["name"])         // Nome deve ter mudado
+		assert.Equal(t, userID, response["id"])
+	})
+
+	t.Run("should update only email when only email is provided", func(t *testing.T) {
+		// Arrange
+		updateData := map[string]interface{}{
+			"email": "only.email@example.com",
+		}
+		jsonData, _ := json.Marshal(updateData)
+
+		// Act
+		req := httptest.NewRequest("PUT", "/users/"+userID, bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "only.email@example.com", response["email"]) // Email deve ter mudado
+		assert.Equal(t, "Only Name Updated", response["name"])       // Nome não deve ter mudado
+		assert.Equal(t, userID, response["id"])
+	})
+
+	t.Run("should fail to update user with invalid ID", func(t *testing.T) {
+		// Arrange
+		updateData := map[string]interface{}{
+			"name": "Invalid User",
+		}
+		jsonData, _ := json.Marshal(updateData)
+
+		// Act
+		req := httptest.NewRequest("PUT", "/users/invalid-id", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("should delete user successfully", func(t *testing.T) {
+		// Act
+		req := httptest.NewRequest("DELETE", "/users/"+userID, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "Usuário deletado com sucesso", response["message"])
+	})
+
+	t.Run("should fail to get deleted user", func(t *testing.T) {
+		// Act
+		req := httptest.NewRequest("GET", "/users/"+userID, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("should fail to delete user with invalid ID", func(t *testing.T) {
+		// Act
+		req := httptest.NewRequest("DELETE", "/users/invalid-id", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Assert
+		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 }
