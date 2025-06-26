@@ -22,7 +22,7 @@ func (uc *UserController) Register(ctx *gin.Context) {
 	var user domain.UserRequest
 
 	if err := ctx.ShouldBindJSON(&user); err != nil {
-		logging.Error("Erro ao decodificar corpo da requisição: %v", err)
+		logging.Error("[%s] Falha ao decodificar corpo da requisição de registro: %v", ctx.ClientIP(), err)
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithError(err))
 		return
 	}
@@ -39,6 +39,7 @@ func (uc *UserController) Register(ctx *gin.Context) {
 			details = append(details, errors.ValidationDetail{Field: "password", Message: "Senha é obrigatória"})
 		}
 
+		logging.Warning("[%s] Tentativa de registro com campos obrigatórios faltando: %+v", ctx.ClientIP(), details)
 		validationErr := errors.NewValidationError("Campos obrigatórios não preenchidos", details)
 		errors.GinHandleError(ctx, validationErr)
 		return
@@ -47,11 +48,12 @@ func (uc *UserController) Register(ctx *gin.Context) {
 	newUser := user.FromUserRequest()
 	err := uc.userService.Create(newUser)
 	if err != nil {
-		logging.Error("Erro ao criar usuário: %v", err)
+		logging.Error("[%s] Falha ao registrar usuário %s: %v", ctx.ClientIP(), newUser.Email, err)
 		errors.GinHandleError(ctx, err)
 		return
 	}
 
+	logging.Info("[%s] Novo usuário registrado: %s (id: %s)", ctx.ClientIP(), newUser.Email, newUser.ID)
 	errors.GinRespondWithJSON(ctx, http.StatusCreated, newUser.ToUserResponse())
 }
 
@@ -62,18 +64,19 @@ func (uc *UserController) Login(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		logging.Error("Erro ao decodificar corpo da requisição: %v", err)
+		logging.Error("[%s] Falha ao decodificar corpo da requisição de login: %v", ctx.ClientIP(), err)
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithError(err))
 		return
 	}
 
 	accessToken, refreshToken, err := uc.userService.Authenticate(req.Email, req.Password)
 	if err != nil {
-		logging.Error("Erro na autenticação: %v", err)
+		logging.Warning("[%s] Tentativa de login falhou para: %s (%v)", ctx.ClientIP(), req.Email, err)
 		errors.GinHandleError(ctx, err)
 		return
 	}
 
+	logging.Info("[%s] Login realizado: %s", ctx.ClientIP(), req.Email)
 	errors.GinRespondWithJSON(ctx, http.StatusOK, gin.H{
 		"token":         accessToken,
 		"refresh_token": refreshToken,
@@ -86,18 +89,19 @@ func (uc *UserController) Logout(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		logging.Error("[%s] Falha ao decodificar corpo da requisição de logout: %v", ctx.ClientIP(), err)
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithError(err))
 		return
 	}
 
 	if req.RefreshToken == "" {
+		logging.Warning("[%s] Tentativa de logout sem refresh token", ctx.ClientIP())
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithMessage("Token de atualização não fornecido"))
 		return
 	}
 
-	// Adiciona o refresh token à blacklist
 	service.BlacklistRefreshToken(req.RefreshToken)
-
+	logging.Info("[%s] Logout realizado (rota: %s)", ctx.ClientIP(), ctx.FullPath())
 	errors.GinRespondWithJSON(ctx, http.StatusOK, gin.H{
 		"message": "Logout realizado com sucesso",
 	})
@@ -109,21 +113,25 @@ func (uc *UserController) RefreshToken(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		logging.Error("[%s] Falha ao decodificar corpo da requisição de refresh: %v", ctx.ClientIP(), err)
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithError(err))
 		return
 	}
 
 	if req.RefreshToken == "" {
+		logging.Warning("[%s] Tentativa de refresh sem refresh token", ctx.ClientIP())
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithMessage("Token de atualização não fornecido"))
 		return
 	}
 
 	accessToken, newRefreshToken, err := uc.userService.RefreshTokens(req.RefreshToken)
 	if err != nil {
+		logging.Warning("[%s] Tentativa de refresh token falhou: %v", ctx.ClientIP(), err)
 		errors.GinHandleError(ctx, err)
 		return
 	}
 
+	logging.Info("[%s] Refresh token bem-sucedido (rota: %s)", ctx.ClientIP(), ctx.FullPath())
 	errors.GinRespondWithJSON(ctx, http.StatusOK, gin.H{
 		"token":         accessToken,
 		"refresh_token": newRefreshToken,
@@ -134,17 +142,19 @@ func (uc *UserController) RefreshToken(ctx *gin.Context) {
 func (uc *UserController) GetByID(ctx *gin.Context) {
 	userID := ctx.Param("id")
 	if userID == "" {
+		logging.Warning("[%s] Tentativa de busca de usuário sem ID", ctx.ClientIP())
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithMessage("ID do usuário não fornecido"))
 		return
 	}
 
 	user, err := uc.userService.GetByID(userID)
 	if err != nil {
-		logging.Error("Erro ao buscar usuário por ID: %v", err)
+		logging.Warning("[%s] Falha ao buscar usuário por ID %s: %v", ctx.ClientIP(), userID, err)
 		errors.GinHandleError(ctx, err)
 		return
 	}
 
+	logging.Info("[%s] Usuário consultado: id=%s", ctx.ClientIP(), userID)
 	errors.GinRespondWithJSON(ctx, http.StatusOK, user.ToUserResponse())
 }
 
@@ -152,6 +162,7 @@ func (uc *UserController) GetByID(ctx *gin.Context) {
 func (uc *UserController) Update(ctx *gin.Context) {
 	userID := ctx.Param("id")
 	if userID == "" {
+		logging.Warning("[%s] Tentativa de atualização sem ID", ctx.ClientIP())
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithMessage("ID do usuário não fornecido"))
 		return
 	}
@@ -162,20 +173,18 @@ func (uc *UserController) Update(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&updateData); err != nil {
-		logging.Error("Erro ao decodificar corpo da requisição: %v", err)
+		logging.Error("[%s] Falha ao decodificar corpo da requisição de update: %v", ctx.ClientIP(), err)
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithError(err))
 		return
 	}
 
-	// Busca o usuário atual
 	currentUser, err := uc.userService.GetByID(userID)
 	if err != nil {
-		logging.Error("Erro ao buscar usuário para atualização: %v", err)
+		logging.Warning("[%s] Falha ao buscar usuário para atualização: %v", ctx.ClientIP(), err)
 		errors.GinHandleError(ctx, err)
 		return
 	}
 
-	// Atualiza apenas os campos fornecidos
 	if updateData.Email != "" {
 		currentUser.Email = updateData.Email
 	}
@@ -185,11 +194,12 @@ func (uc *UserController) Update(ctx *gin.Context) {
 
 	err = uc.userService.Update(currentUser)
 	if err != nil {
-		logging.Error("Erro ao atualizar usuário: %v", err)
+		logging.Error("[%s] Falha ao atualizar usuário %s: %v", ctx.ClientIP(), userID, err)
 		errors.GinHandleError(ctx, err)
 		return
 	}
 
+	logging.Info("[%s] Usuário atualizado: id=%s", ctx.ClientIP(), userID)
 	errors.GinRespondWithJSON(ctx, http.StatusOK, currentUser.ToUserResponse())
 }
 
@@ -197,17 +207,19 @@ func (uc *UserController) Update(ctx *gin.Context) {
 func (uc *UserController) Delete(ctx *gin.Context) {
 	userID := ctx.Param("id")
 	if userID == "" {
+		logging.Warning("[%s] Tentativa de deleção sem ID", ctx.ClientIP())
 		errors.GinHandleError(ctx, errors.ErrBadRequest.WithMessage("ID do usuário não fornecido"))
 		return
 	}
 
 	err := uc.userService.Delete(userID)
 	if err != nil {
-		logging.Error("Erro ao deletar usuário: %v", err)
+		logging.Error("[%s] Falha ao deletar usuário %s: %v", ctx.ClientIP(), userID, err)
 		errors.GinHandleError(ctx, err)
 		return
 	}
 
+	logging.Info("[%s] Usuário deletado: id=%s", ctx.ClientIP(), userID)
 	errors.GinRespondWithJSON(ctx, http.StatusOK, gin.H{
 		"message": "Usuário deletado com sucesso",
 	})
