@@ -125,6 +125,21 @@ func (ur *UserRepository) Delete(id string) error {
 	return nil
 }
 
+// List retorna todos os usuários
+func (ur *UserRepository) List() ([]*domain.User, error) {
+	ctx := context.Background()
+	prismaUsers, err := ur.db.User.FindMany().Exec(ctx)
+	if err != nil {
+		logging.Error("Erro ao listar usuários: %v", err)
+		return nil, err
+	}
+	users := make([]*domain.User, 0, len(prismaUsers))
+	for _, pu := range prismaUsers {
+		users = append(users, mapPrismaUserToDomain(&pu))
+	}
+	return users, nil
+}
+
 // mapPrismaUserToDomain converte um model Prisma para o modelo de domínio
 func mapPrismaUserToDomain(prismaUser *db.UserModel) *domain.User {
 	if prismaUser == nil {
@@ -141,6 +156,7 @@ func mapPrismaUserToDomain(prismaUser *db.UserModel) *domain.User {
 		Email:     prismaUser.Email,
 		Password:  prismaUser.Password,
 		Name:      name,
+		Roles:     prismaUser.InnerUser.Roles,
 		CreatedAt: prismaUser.CreatedAt,
 		UpdatedAt: prismaUser.UpdatedAt,
 	}

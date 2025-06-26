@@ -10,6 +10,7 @@ type User struct {
 	Email     string    `json:"email"`
 	Password  string    `json:"-"` // não expor senha nas respostas JSON
 	Name      string    `json:"name,omitempty"`
+	Roles     []string  `json:"roles,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -22,6 +23,7 @@ type UserService interface {
 	Update(user *User) error
 	Delete(id string) error
 	Authenticate(email, password string) (string, error) // retorna token JWT
+	List() ([]*User, error)
 }
 
 // UserRepository define as operações de persistência para usuários
@@ -31,6 +33,7 @@ type UserRepository interface {
 	GetByEmail(email string) (*User, error)
 	Update(user *User) error
 	Delete(id string) error
+	List() ([]*User, error)
 }
 
 // UserResponse representa a resposta de um usuário
@@ -38,6 +41,7 @@ type UserResponse struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
 	Name      string    `json:"name,omitempty"`
+	Roles     []string  `json:"roles,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -55,6 +59,7 @@ func (u *User) ToUserResponse() *UserResponse {
 		ID:        u.ID,
 		Email:     u.Email,
 		Name:      u.Name,
+		Roles:     u.Roles,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}
@@ -65,5 +70,6 @@ func (u *UserRequest) FromUserRequest() *User {
 		Email:    u.Email,
 		Password: u.Password,
 		Name:     u.Name,
+		Roles:    []string{"user"}, // padrão: todo novo usuário é "user"
 	}
 }

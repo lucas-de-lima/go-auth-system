@@ -223,3 +223,13 @@ func ClearRefreshTokenBlacklist() {
 func (us *UserService) GetJWTService() *auth.JWTService {
 	return us.jwtService
 }
+
+// ListAll retorna todos os usuários (admin)
+func (us *UserService) ListAll() ([]*domain.User, error) {
+	users, err := us.userRepo.List()
+	if err != nil {
+		logging.Error("Erro ao listar usuários: %v", err)
+		return nil, errors.ErrInternalServer.WithError(err)
+	}
+	return users, nil
+}

@@ -101,6 +101,7 @@ func (m *AuthMiddleware) GinAuthenticate() gin.HandlerFunc {
 		// Adiciona informações do usuário ao contexto
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)
+		c.Set("roles", claims.Roles)
 
 		logging.Info("[%s] [%s] [%s] Autenticação bem-sucedida para user_id=%s, email=%s", ip, rota, userAgent, claims.UserID, claims.Email)
 
@@ -135,16 +136,32 @@ func (m *AuthMiddleware) GinRequireRole(role string) gin.HandlerFunc {
 		userAgent := c.Request.UserAgent()
 		userID, exists := c.Get("user_id")
 		userEmail, _ := c.Get("user_email")
-		if !exists {
-			logging.Warning("[%s] [%s] [%s] Tentativa de acesso negada a recurso protegido (role=%s) sem autenticação", ip, rota, userAgent, role)
-			errors.GinHandleError(c, errors.ErrUnauthorized)
+
+		// Busca as roles do contexto (claims do JWT)
+		rolesIface, hasRoles := c.Get("roles")
+		var roles []string
+		if hasRoles {
+			roles, _ = rolesIface.([]string)
+		}
+
+		if !exists || !hasRoles || !containsRole(roles, role) {
+			logging.Warning("[%s] [%s] [%s] Acesso negado: usuário (id=%v, email=%v) não possui o papel '%s'", ip, rota, userAgent, userID, userEmail, role)
+			errors.GinHandleError(c, errors.ErrForbidden.WithMessage("Acesso negado: permissão insuficiente"))
 			c.Abort()
 			return
 		}
 
-		logging.Info("[%s] [%s] [%s] Usuário autenticado (id=%v, email=%v) acessando recurso protegido (role=%s)", ip, rota, userAgent, userID, userEmail, role)
-
-		// Continua para o próximo handler
+		logging.Info("[%s] [%s] [%s] Usuário autorizado (id=%v, email=%v) com papel '%s'", ip, rota, userAgent, userID, userEmail, role)
 		c.Next()
 	}
+}
+
+// containsRole verifica se o slice de roles contém o papel exigido
+func containsRole(roles []string, role string) bool {
+	for _, r := range roles {
+		if r == role {
+			return true
+		}
+	}
+	return false
 }

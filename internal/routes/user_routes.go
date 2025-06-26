@@ -9,15 +9,17 @@ import (
 
 // UserRoutes define as rotas relacionadas a usuários
 type UserRoutes struct {
-	userController *user.UserController
-	authMiddleware *middleware.AuthMiddleware
+	userController  *user.UserController
+	authMiddleware  *middleware.AuthMiddleware
+	adminController *user.AdminController
 }
 
 // NewUserRoutes cria uma nova instância de rotas de usuário
-func NewUserRoutes(userController *user.UserController, jwtService *auth.JWTService) *UserRoutes {
+func NewUserRoutes(userController *user.UserController, jwtService *auth.JWTService, adminController *user.AdminController) *UserRoutes {
 	return &UserRoutes{
-		userController: userController,
-		authMiddleware: middleware.NewAuthMiddleware(jwtService),
+		userController:  userController,
+		authMiddleware:  middleware.NewAuthMiddleware(jwtService),
+		adminController: adminController,
 	}
 }
 
@@ -36,12 +38,15 @@ func (ur *UserRoutes) Setup(router *gin.Engine) {
 	protectedRoutes.Use(ur.authMiddleware.GinAuthenticate())
 	{
 		protectedRoutes.POST("/logout", ur.userController.Logout)
+	}
 
-		// Exemplo de rota com requisito de papel/função
-		// adminRoutes := protectedRoutes.Group("/admin")
-		// adminRoutes.Use(ur.authMiddleware.GinRequireRole("admin"))
-		// {
-		//     adminRoutes.GET("/users", adminController.ListAllUsers)
-		// }
+	// Rotas de admin (protegidas por autenticação e role 'admin')
+	adminRoutes := router.Group("/admin")
+	adminRoutes.Use(ur.authMiddleware.GinAuthenticate(), ur.authMiddleware.GinRequireRole("admin"))
+	{
+		adminRoutes.GET("/users", ur.adminController.ListAll)
+		adminRoutes.GET("/users/:id", ur.adminController.GetByID)
+		adminRoutes.PUT("/users/:id", ur.adminController.Update)
+		adminRoutes.DELETE("/users/:id", ur.adminController.Delete)
 	}
 }

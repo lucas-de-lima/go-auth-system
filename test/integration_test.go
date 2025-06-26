@@ -125,6 +125,15 @@ func (r *InMemoryUserRepository) Delete(id string) error {
 	return nil
 }
 
+// Adiciona o método List para compatibilidade com a interface domain.UserRepository
+func (r *InMemoryUserRepository) List() ([]*domain.User, error) {
+	users := make([]*domain.User, 0, len(r.users))
+	for _, user := range r.users {
+		users = append(users, user)
+	}
+	return users, nil
+}
+
 // TestUserRegistration testa o fluxo de registro de usuário
 func TestUserRegistration(t *testing.T) {
 	router, _ := setupTestEnvironment()
