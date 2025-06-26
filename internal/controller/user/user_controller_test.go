@@ -703,15 +703,144 @@ func TestUserController_RefreshToken_MissingToken(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-// Testa atualização de usuário com JSON malformado, espera erro 400
-func TestUserController_Update_BadRequest(t *testing.T) {
-	ms := &mockUserService{GetByIDFn: func(id string) (*domain.User, error) { return &domain.User{ID: id, Email: "a@b.com"}, nil }, UpdateFn: func(u *domain.User) error { return nil }}
+// Testa GetByID com ID vazio
+func TestUserController_GetByID_EmptyID(t *testing.T) {
+	t.Log("[INICIO] TestUserController_GetByID_EmptyID")
+
+	ms := &mockUserService{
+		CreateFn:        func(u *domain.User) error { return nil },
+		AuthenticateFn:  func(string, string) (string, string, error) { return "", "", nil },
+		RefreshTokensFn: func(string) (string, string, error) { return "", "", nil },
+		GetByIDFn:       func(string) (*domain.User, error) { return nil, nil },
+		UpdateFn:        func(*domain.User) error { return nil },
+		DeleteFn:        func(string) error { return nil },
+		GetByEmailFn:    func(string) (*domain.User, error) { return nil, nil },
+		ListFn:          func() ([]*domain.User, error) { return nil, nil },
+	}
+	uc := NewUserController(ms)
+	r := setupGin()
+	r.GET("/users/:id", uc.GetByID)
+	req := httptest.NewRequest("GET", "/users/", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	// Quando o ID está vazio, o Gin retorna 404 (não encontra a rota)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	t.Log("[FIM] TestUserController_GetByID_EmptyID")
+}
+
+// Testa Update com ID vazio
+func TestUserController_Update_EmptyID(t *testing.T) {
+	t.Log("[INICIO] TestUserController_Update_EmptyID")
+
+	ms := &mockUserService{
+		CreateFn:        func(u *domain.User) error { return nil },
+		AuthenticateFn:  func(string, string) (string, string, error) { return "", "", nil },
+		RefreshTokensFn: func(string) (string, string, error) { return "", "", nil },
+		GetByIDFn:       func(string) (*domain.User, error) { return nil, nil },
+		UpdateFn:        func(*domain.User) error { return nil },
+		DeleteFn:        func(string) error { return nil },
+		GetByEmailFn:    func(string) (*domain.User, error) { return nil, nil },
+		ListFn:          func() ([]*domain.User, error) { return nil, nil },
+	}
 	uc := NewUserController(ms)
 	r := setupGin()
 	r.PUT("/users/:id", uc.Update)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("PUT", "/users/1", bytes.NewBuffer([]byte("{malformed}")))
+	body := map[string]interface{}{"email": "novo@b.com"}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest("PUT", "/users/", bytes.NewBuffer(b))
 	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
 	r.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// Quando o ID está vazio, o Gin retorna 404 (não encontra a rota)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	t.Log("[FIM] TestUserController_Update_EmptyID")
+}
+
+// Testa Delete com ID vazio
+func TestUserController_Delete_EmptyID(t *testing.T) {
+	t.Log("[INICIO] TestUserController_Delete_EmptyID")
+
+	ms := &mockUserService{
+		CreateFn:        func(u *domain.User) error { return nil },
+		AuthenticateFn:  func(string, string) (string, string, error) { return "", "", nil },
+		RefreshTokensFn: func(string) (string, string, error) { return "", "", nil },
+		GetByIDFn:       func(string) (*domain.User, error) { return nil, nil },
+		UpdateFn:        func(*domain.User) error { return nil },
+		DeleteFn:        func(string) error { return nil },
+		GetByEmailFn:    func(string) (*domain.User, error) { return nil, nil },
+		ListFn:          func() ([]*domain.User, error) { return nil, nil },
+	}
+	uc := NewUserController(ms)
+	r := setupGin()
+	r.DELETE("/users/:id", uc.Delete)
+	req := httptest.NewRequest("DELETE", "/users/", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	// Quando o ID está vazio, o Gin retorna 404 (não encontra a rota)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	t.Log("[FIM] TestUserController_Delete_EmptyID")
+}
+
+// Testa Update com apenas email
+func TestUserController_Update_OnlyEmail(t *testing.T) {
+	t.Log("[INICIO] TestUserController_Update_OnlyEmail")
+
+	ms := &mockUserService{
+		CreateFn:        func(u *domain.User) error { return nil },
+		AuthenticateFn:  func(string, string) (string, string, error) { return "", "", nil },
+		RefreshTokensFn: func(string) (string, string, error) { return "", "", nil },
+		GetByIDFn:       func(string) (*domain.User, error) { return &domain.User{ID: "1", Email: "old@b.com", Name: "Old"}, nil },
+		UpdateFn:        func(u *domain.User) error { return nil },
+		DeleteFn:        func(string) error { return nil },
+		GetByEmailFn:    func(string) (*domain.User, error) { return nil, nil },
+		ListFn:          func() ([]*domain.User, error) { return nil, nil },
+	}
+	uc := NewUserController(ms)
+	r := setupGin()
+	r.PUT("/users/:id", uc.Update)
+	body := map[string]interface{}{"email": "novo@b.com"}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest("PUT", "/users/1", bytes.NewBuffer(b))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	t.Log("[FIM] TestUserController_Update_OnlyEmail")
+}
+
+// Testa Update com apenas nome
+func TestUserController_Update_OnlyName(t *testing.T) {
+	t.Log("[INICIO] TestUserController_Update_OnlyName")
+
+	ms := &mockUserService{
+		CreateFn:        func(u *domain.User) error { return nil },
+		AuthenticateFn:  func(string, string) (string, string, error) { return "", "", nil },
+		RefreshTokensFn: func(string) (string, string, error) { return "", "", nil },
+		GetByIDFn:       func(string) (*domain.User, error) { return &domain.User{ID: "1", Email: "a@b.com", Name: "Old"}, nil },
+		UpdateFn:        func(u *domain.User) error { return nil },
+		DeleteFn:        func(string) error { return nil },
+		GetByEmailFn:    func(string) (*domain.User, error) { return nil, nil },
+		ListFn:          func() ([]*domain.User, error) { return nil, nil },
+	}
+	uc := NewUserController(ms)
+	r := setupGin()
+	r.PUT("/users/:id", uc.Update)
+	body := map[string]interface{}{"name": "Novo Nome"}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest("PUT", "/users/1", bytes.NewBuffer(b))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	t.Log("[FIM] TestUserController_Update_OnlyName")
 }

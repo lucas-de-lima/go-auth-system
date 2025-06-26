@@ -298,3 +298,14 @@ func TestUserService_ListAll_ErrorAndEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, users, 0)
 }
+
+func TestUserService_List(t *testing.T) {
+	repo := newMockUserRepo()
+	jwtService := auth.NewJWTService("secret", 1, "refresh", 1)
+	us := NewUserService(repo, jwtService)
+	_ = us.Create(&domain.User{ID: "7", Email: "g@b.com", Password: "senha", Name: "G"})
+	_ = us.Create(&domain.User{ID: "8", Email: "h@b.com", Password: "senha", Name: "H"})
+	users, err := us.List()
+	assert.NoError(t, err, "Erro inesperado ao listar usuários")
+	assert.Len(t, users, 2, "Deveria retornar 2 usuários")
+}

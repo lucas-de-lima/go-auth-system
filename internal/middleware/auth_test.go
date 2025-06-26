@@ -130,3 +130,45 @@ func TestRequireRole_HTTP_SuccessAndFail(t *testing.T) {
 	handler.ServeHTTP(w2, req2)
 	assert.Equal(t, 401, w2.Code)
 }
+
+func TestGinAuthenticate_InvalidHeaderFormat(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtService := getJWT()
+	mw := NewAuthMiddleware(jwtService)
+	r := gin.New()
+	r.GET("/protected", mw.GinAuthenticate(), func(c *gin.Context) {
+		c.String(200, "ok")
+	})
+	// Header sem 'Bearer'
+	req := httptest.NewRequest("GET", "/protected", nil)
+	req.Header.Set("Authorization", "Token x")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, 400, w.Code)
+	// Header só 'Bearer'
+	req2 := httptest.NewRequest("GET", "/protected", nil)
+	req2.Header.Set("Authorization", "Bearer")
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+	assert.Equal(t, 400, w2.Code)
+}
+
+func TestAuthenticate_InvalidHeaderFormat(t *testing.T) {
+	jwtService := getJWT()
+	mw := NewAuthMiddleware(jwtService)
+	handler := mw.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}))
+	// Header sem 'Bearer'
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Token x")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	assert.Equal(t, 400, w.Code)
+	// Header só 'Bearer'
+	req2 := httptest.NewRequest("GET", "/", nil)
+	req2.Header.Set("Authorization", "Bearer")
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, req2)
+	assert.Equal(t, 400, w2.Code)
+}

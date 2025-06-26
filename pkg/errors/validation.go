@@ -58,17 +58,15 @@ func GetValidationDetails(err error) ([]ValidationDetail, bool) {
 
 // FormatValidationResponse formata uma resposta de erro de validação
 func FormatValidationResponse(err error) map[string]interface{} {
-	details, ok := GetValidationDetails(err)
-	if !ok {
-		return nil
-	}
+	resp := make(map[string]interface{})
+	resp["message"] = GetMessage(err)
 
-	fields := make(map[string]interface{})
-	for _, detail := range details {
-		fields[detail.Field] = detail.Message
+	if details, ok := GetValidationDetails(err); ok {
+		fields := make(map[string]interface{})
+		for _, detail := range details {
+			fields[detail.Field] = detail.Message
+		}
+		resp["fields"] = fields
 	}
-
-	return map[string]interface{}{
-		"fields": fields,
-	}
+	return resp
 }

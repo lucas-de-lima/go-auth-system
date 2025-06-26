@@ -178,3 +178,38 @@ func TestGinValidationResponse(t *testing.T) {
 		t.Errorf("Campo 'password' não encontrado ou com valor incorreto: %v", password)
 	}
 }
+
+func TestGinRespondWithValidationError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/validation", func(c *gin.Context) {
+		details := map[string]interface{}{"email": "inválido"}
+		GinRespondWithValidationError(c, "Erro de validação", details)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/validation", nil)
+	r.ServeHTTP(w, req)
+
+	assertStatus(t, w.Code, http.StatusBadRequest)
+
+	var resp ErrorResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	if err != nil {
+		t.Fatalf("Erro ao decodificar resposta JSON: %v", err)
+	}
+	if resp.Message != "Erro de validação" {
+		t.Errorf("Esperava mensagem 'Erro de validação', obteve '%s'", resp.Message)
+	}
+	if resp.Details == nil {
+		t.Error("Esperava detalhes de validação, mas veio nil")
+	}
+}
+
+// assertStatus é um helper para comparar status HTTP
+func assertStatus(t *testing.T, got, want int) {
+	t.Helper()
+	if got != want {
+		t.Errorf("Status esperado %d, mas foi %d", want, got)
+	}
+}
