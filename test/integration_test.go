@@ -14,6 +14,7 @@ import (
 	"github.com/lucas-de-lima/go-auth-system/internal/auth"
 	"github.com/lucas-de-lima/go-auth-system/internal/controller/user"
 	"github.com/lucas-de-lima/go-auth-system/internal/domain"
+	"github.com/lucas-de-lima/go-auth-system/internal/middleware"
 	"github.com/lucas-de-lima/go-auth-system/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,6 +56,15 @@ func setupTestEnvironment() (*gin.Engine, *service.UserService) {
 	router.GET("/users/:id", userController.GetByID)
 	router.PUT("/users/:id", userController.Update)
 	router.DELETE("/users/:id", userController.Delete)
+
+	// Criar AuthMiddleware
+	authMiddleware := middleware.NewAuthMiddleware(jwtService)
+
+	// Rota protegida para teste de middleware
+	router.GET("/protected", authMiddleware.GinAuthenticate(), func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		c.JSON(200, gin.H{"message": "Acesso permitido", "user_id": userID})
+	})
 
 	return router, userService
 }
@@ -795,4 +805,78 @@ func generateShortLivedRefreshToken(jwtService *auth.JWTService, userID string, 
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(jwtService.GetRefreshKey()))
+}
+
+// TestAuthMiddleware testa o middleware de autenticação
+func TestAuthMiddleware(t *testing.T) {
+	router, userService := setupTestEnvironment()
+
+	// Criar usuário e obter token
+	testUser := &domain.User{
+		Email:    "middleware@example.com",
+		Password: "password123",
+		Name:     "Middleware User",
+	}
+	err := userService.Create(testUser)
+	require.NoError(t, err)
+
+	accessToken, _, err := userService.Authenticate("middleware@example.com", "password123")
+	require.NoError(t, err)
+
+	t.Run("should deny access without token", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/protected", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("should deny access with malformed token", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/protected", nil)
+		req.Header.Set("Authorization", "Bearer malformed.token")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("should deny access with expired token", func(t *testing.T) {
+		jwtService := userService.GetJWTService()
+		expiredToken, err := generateShortLivedAccessToken(jwtService, testUser, 1) // 1 segundo
+		require.NoError(t, err)
+		time.Sleep(2 * time.Second)
+
+		req := httptest.NewRequest("GET", "/protected", nil)
+		req.Header.Set("Authorization", "Bearer "+expiredToken)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("should allow access with valid token", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/protected", nil)
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+		assert.Equal(t, "Acesso permitido", response["message"])
+		assert.NotEmpty(t, response["user_id"])
+	})
+}
+
+// generateShortLivedAccessToken gera um access token com expiração customizada
+func generateShortLivedAccessToken(jwtService *auth.JWTService, user *domain.User, seconds int) (string, error) {
+	expirationTime := time.Now().Add(time.Second * time.Duration(seconds))
+	claims := &auth.TokenClaims{
+		UserID: user.ID,
+		Email:  user.Email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			Subject:   user.ID,
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(jwtService.GetSecretKey()))
 }

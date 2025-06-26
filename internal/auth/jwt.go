@@ -105,3 +105,8 @@ func (s *JWTService) ValidateRefreshToken(tokenString string) (*jwt.RegisteredCl
 func (s *JWTService) GetRefreshKey() string {
 	return s.refreshKey
 }
+
+// GetSecretKey retorna a chave secreta do access token (uso exclusivo para testes)
+func (s *JWTService) GetSecretKey() string {
+	return s.secretKey
+}
