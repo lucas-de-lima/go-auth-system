@@ -22,7 +22,8 @@ type UserService interface {
 	GetByEmail(email string) (*User, error)
 	Update(user *User) error
 	Delete(id string) error
-	Authenticate(email, password string) (string, error) // retorna token JWT
+	Authenticate(email, password string) (string, string, error) // access, refresh, error
+	RefreshTokens(refreshToken string) (string, string, error)   // access, refresh, error
 	List() ([]*User, error)
 }
 

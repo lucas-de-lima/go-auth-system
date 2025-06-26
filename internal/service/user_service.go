@@ -16,6 +16,9 @@ type UserService struct {
 	jwtService *auth.JWTService
 }
 
+// Garantir que UserService implementa domain.UserService
+var _ domain.UserService = (*UserService)(nil)
+
 // NewUserService cria uma nova instância do serviço de usuário
 func NewUserService(userRepo domain.UserRepository, jwtService *auth.JWTService) *UserService {
 	return &UserService{
@@ -232,4 +235,9 @@ func (us *UserService) ListAll() ([]*domain.User, error) {
 		return nil, errors.ErrInternalServer.WithError(err)
 	}
 	return users, nil
+}
+
+// List implementa a interface domain.UserService
+func (us *UserService) List() ([]*domain.User, error) {
+	return us.ListAll()
 }

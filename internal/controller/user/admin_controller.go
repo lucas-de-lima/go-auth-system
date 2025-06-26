@@ -5,22 +5,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lucas-de-lima/go-auth-system/internal/domain"
-	"github.com/lucas-de-lima/go-auth-system/internal/service"
 	"github.com/lucas-de-lima/go-auth-system/pkg/errors"
 	"github.com/lucas-de-lima/go-auth-system/pkg/logging"
 )
 
 type AdminController struct {
-	userService *service.UserService
+	userService domain.UserService
 }
 
-func NewAdminController(userService *service.UserService) *AdminController {
+func NewAdminController(userService domain.UserService) *AdminController {
 	return &AdminController{userService: userService}
 }
 
 // ListAll lista todos os usuários
 func (ac *AdminController) ListAll(ctx *gin.Context) {
-	users, err := ac.userService.ListAll()
+	users, err := ac.userService.List()
 	if err != nil {
 		logging.Error("Erro ao listar usuários: %v", err)
 		errors.GinHandleError(ctx, errors.ErrInternalServer.WithError(err))
