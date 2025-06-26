@@ -37,6 +37,7 @@ type UserRepository interface {
 type UserResponse struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
+	Name      string    `json:"name,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -45,6 +46,7 @@ type UserResponse struct {
 type UserRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=3"`
+	Name     string `json:"name,omitempty"`
 }
 
 // Mapper functions
@@ -52,6 +54,7 @@ func (u *User) ToUserResponse() *UserResponse {
 	return &UserResponse{
 		ID:        u.ID,
 		Email:     u.Email,
+		Name:      u.Name,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}
@@ -61,5 +64,6 @@ func (u *UserRequest) FromUserRequest() *User {
 	return &User{
 		Email:    u.Email,
 		Password: u.Password,
+		Name:     u.Name,
 	}
 }

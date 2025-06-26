@@ -67,7 +67,7 @@ func (uc *UserController) Login(ctx *gin.Context) {
 		return
 	}
 
-	token, err := uc.userService.Authenticate(req.Email, req.Password)
+	accessToken, refreshToken, err := uc.userService.Authenticate(req.Email, req.Password)
 	if err != nil {
 		logging.Error("Erro na autenticação: %v", err)
 		errors.GinHandleError(ctx, err)
@@ -75,29 +75,12 @@ func (uc *UserController) Login(ctx *gin.Context) {
 	}
 
 	errors.GinRespondWithJSON(ctx, http.StatusOK, gin.H{
-		"token": token,
+		"token":         accessToken,
+		"refresh_token": refreshToken,
 	})
 }
 
 func (uc *UserController) Logout(ctx *gin.Context) {
-	// Implementação do método de logout usando o novo sistema de erros
-	// Exemplo:
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		errors.GinHandleError(ctx, errors.ErrUnauthorized)
-		return
-	}
-
-	// Aqui implementaria a lógica de logout
-	logging.Info("Usuário %s realizou logout", userID)
-
-	errors.GinRespondWithJSON(ctx, http.StatusOK, gin.H{
-		"message": "Logout realizado com sucesso",
-	})
-}
-
-func (uc *UserController) RefreshToken(ctx *gin.Context) {
-	// Implementação do método de refresh token usando o novo sistema de erros
 	var req struct {
 		RefreshToken string `json:"refresh_token"`
 	}
@@ -112,10 +95,37 @@ func (uc *UserController) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	// Aqui implementaria a lógica de refresh token
-	// Por enquanto apenas um exemplo:
+	// Adiciona o refresh token à blacklist
+	service.BlacklistRefreshToken(req.RefreshToken)
+
 	errors.GinRespondWithJSON(ctx, http.StatusOK, gin.H{
-		"message": "Token atualizado com sucesso",
-		"token":   "novo-token-jwt",
+		"message": "Logout realizado com sucesso",
+	})
+}
+
+func (uc *UserController) RefreshToken(ctx *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		errors.GinHandleError(ctx, errors.ErrBadRequest.WithError(err))
+		return
+	}
+
+	if req.RefreshToken == "" {
+		errors.GinHandleError(ctx, errors.ErrBadRequest.WithMessage("Token de atualização não fornecido"))
+		return
+	}
+
+	accessToken, newRefreshToken, err := uc.userService.RefreshTokens(req.RefreshToken)
+	if err != nil {
+		errors.GinHandleError(ctx, err)
+		return
+	}
+
+	errors.GinRespondWithJSON(ctx, http.StatusOK, gin.H{
+		"token":         accessToken,
+		"refresh_token": newRefreshToken,
 	})
 }

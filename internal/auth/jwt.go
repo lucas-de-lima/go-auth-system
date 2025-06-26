@@ -83,3 +83,20 @@ func (s *JWTService) GenerateRefreshToken(userID string) (string, error) {
 
 	return token.SignedString([]byte(s.refreshKey))
 }
+
+// ValidateRefreshToken valida um refresh token e retorna as claims se válido
+func (s *JWTService) ValidateRefreshToken(tokenString string) (*jwt.RegisteredClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (any, error) {
+		return []byte(s.refreshKey), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, errors.New("refresh token inválido")
+}

@@ -5,7 +5,6 @@ import (
 
 	"github.com/lucas-de-lima/go-auth-system/internal/auth"
 	"github.com/lucas-de-lima/go-auth-system/internal/domain"
-	"github.com/lucas-de-lima/go-auth-system/internal/repository"
 	"github.com/lucas-de-lima/go-auth-system/pkg/errors"
 	"github.com/lucas-de-lima/go-auth-system/pkg/logging"
 	"golang.org/x/crypto/bcrypt"
@@ -13,12 +12,12 @@ import (
 
 // UserService implementa a interface domain.UserService
 type UserService struct {
-	userRepo   *repository.UserRepository
+	userRepo   domain.UserRepository
 	jwtService *auth.JWTService
 }
 
 // NewUserService cria uma nova instância do serviço de usuário
-func NewUserService(userRepo *repository.UserRepository, jwtService *auth.JWTService) *UserService {
+func NewUserService(userRepo domain.UserRepository, jwtService *auth.JWTService) *UserService {
 	return &UserService{
 		userRepo:   userRepo,
 		jwtService: jwtService,
@@ -137,32 +136,85 @@ func (us *UserService) Delete(id string) error {
 	return nil
 }
 
-// Authenticate autentica um usuário e retorna um token JWT
-func (us *UserService) Authenticate(email, password string) (string, error) {
+// Authenticate autentica um usuário e retorna access token e refresh token
+func (us *UserService) Authenticate(email, password string) (string, string, error) {
 	// Busca o usuário pelo email
 	user, err := us.userRepo.GetByEmail(email)
 	if err != nil {
 		logging.Error("Erro ao buscar usuário para autenticação: %v", err)
-		return "", errors.ErrInternalServer.WithError(err)
+		return "", "", errors.ErrInternalServer.WithError(err)
 	}
 
 	if user == nil {
-		return "", errors.ErrInvalidCredentials
+		return "", "", errors.ErrInvalidCredentials
 	}
 
 	// Verifica a senha
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
 		logging.Error("Senha inválida para usuário %s: %v", email, err)
-		return "", errors.ErrInvalidCredentials
+		return "", "", errors.ErrInvalidCredentials
 	}
 
 	// Gera o token JWT
-	token, err := us.jwtService.GenerateToken(user)
+	accessToken, err := us.jwtService.GenerateToken(user)
 	if err != nil {
 		logging.Error("Erro ao gerar token JWT: %v", err)
-		return "", errors.ErrInternalServer.WithError(err)
+		return "", "", errors.ErrInternalServer.WithError(err)
 	}
 
-	return token, nil
+	refreshToken, err := us.jwtService.GenerateRefreshToken(user.ID)
+	if err != nil {
+		logging.Error("Erro ao gerar refresh token: %v", err)
+		return "", "", errors.ErrInternalServer.WithError(err)
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+// refreshTokenBlacklist é um mapa em memória para blacklist de refresh tokens
+var refreshTokenBlacklist = make(map[string]struct{})
+
+// RefreshTokens realiza a rotação do refresh token e gera novos tokens
+func (us *UserService) RefreshTokens(refreshToken string) (string, string, error) {
+	// Verifica se o token está na blacklist
+	if _, blacklisted := refreshTokenBlacklist[refreshToken]; blacklisted {
+		return "", "", errors.ErrUnauthorized.WithMessage("Refresh token inválido ou já utilizado")
+	}
+
+	claims, err := us.jwtService.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		return "", "", errors.ErrUnauthorized.WithError(err)
+	}
+
+	userID := claims.Subject
+	user, err := us.userRepo.GetByID(userID)
+	if err != nil || user == nil {
+		return "", "", errors.ErrUserNotFound
+	}
+
+	// Gera novos tokens
+	accessToken, err := us.jwtService.GenerateToken(user)
+	if err != nil {
+		return "", "", errors.ErrInternalServer.WithError(err)
+	}
+	newRefreshToken, err := us.jwtService.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return "", "", errors.ErrInternalServer.WithError(err)
+	}
+
+	// Adiciona o refresh token antigo à blacklist
+	refreshTokenBlacklist[refreshToken] = struct{}{}
+
+	return accessToken, newRefreshToken, nil
+}
+
+// BlacklistRefreshToken adiciona um refresh token à blacklist em memória
+func BlacklistRefreshToken(token string) {
+	refreshTokenBlacklist[token] = struct{}{}
+}
+
+// ClearRefreshTokenBlacklist limpa a blacklist de refresh tokens (usado apenas para testes)
+func ClearRefreshTokenBlacklist() {
+	refreshTokenBlacklist = make(map[string]struct{})
 }
