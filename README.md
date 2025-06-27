@@ -1,3 +1,5 @@
+🌐 [🇺🇸 English version](README.en.md)
+
 # 🔐 Sistema de Autenticação e Autorização em Go
 
 [![Go Version](https://img.shields.io/badge/Go-1.24+-blue.svg)](https://golang.org/)
@@ -573,7 +575,8 @@ Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICE
 - [Prisma](https://www.prisma.io/) - ORM moderno
 - [JWT-Go](https://github.com/golang-jwt/jwt) - Implementação JWT
 - [Testify](https://github.com/stretchr/testify) - Framework de testes
+- **Cursor** - A IDE com IA que facilitou o desenvolvimento deste projeto
 
 ---
 
-**Desenvolvido com ❤️ em Go** 
+**Desenvolvido com ❤️ Go e IA** 
