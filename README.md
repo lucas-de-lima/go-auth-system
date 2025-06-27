@@ -1,4 +1,4 @@
-🌐 [🇺🇸 English version](README.en.md)
+🌐 [English version](README.en.md)
 
 # 🔐 Sistema de Autenticação e Autorização em Go
 

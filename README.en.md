@@ -1,4 +1,4 @@
-🌐 [🇧🇷 Versão em Português (BR)](README.md)
+🌐 [Versão em Português (BR)](README.md)
 
 # 🔐 Authentication and Authorization System in Go
 
