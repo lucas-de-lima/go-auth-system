@@ -86,7 +86,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.userService.Authenticate(req.Email, req.Password)
+	token, refreshToken, err := h.userService.Authenticate(req.Email, req.Password)
 	if err != nil {
 		logging.Error("Erro na autenticação: %v", err)
 		errors.HandleError(w, err)
@@ -94,7 +94,8 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	errors.RespondWithJSON(w, http.StatusOK, map[string]string{
-		"token": token,
+		"access_token":  token,
+		"refresh_token": refreshToken,
 	})
 }
 

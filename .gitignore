@@ -1,3 +1,7 @@
+# =============================================================================
+# GO SPECIFIC
+# =============================================================================
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -17,25 +21,254 @@ vendor/
 # Go workspace file
 go.work
 
-# Environment variables
+# =============================================================================
+# SECURITY & ENVIRONMENT
+# =============================================================================
+
+# Environment variables and secrets
 .env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
 configs/app.env
+configs/*.env
+!configs/*.env.example
+
+# SSL/TLS certificates and keys
+*.key
+*.pem
+*.crt
+*.csr
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.ppk
+
+# API keys and tokens
+api_keys.txt
+tokens.txt
+secrets.json
+credentials.json
+
+# =============================================================================
+# PRISMA & DATABASE
+# =============================================================================
 
 # Prisma generated files
-prisma/db
+prisma/db/
+prisma/migrations/
+prisma/generated/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Database dumps
+*.sql
+*.dump
+*.backup
+
+# =============================================================================
+# IDE & EDITOR
+# =============================================================================
 
 # IDE specific files
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
-# macOS specific files
+# JetBrains IDEs
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+.vim/
+*.vim
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# =============================================================================
+# OPERATING SYSTEM
+# =============================================================================
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# BUILD & DEPLOYMENT
+# =============================================================================
 
 # Build artifacts
 /bin/
+/build/
+/dist/
 /tmp/
+/temp/
+
+# Docker
+.dockerignore
+Dockerfile.local
+docker-compose.override.yml
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+
+# =============================================================================
+# LOGS & DEBUGGING
+# =============================================================================
 
 # Logs
-*.log 
+*.log
+logs/
+*.log.*
+
+# Debug files
+debug/
+*.debug
+
+# Profiling
+*.prof
+*.pprof
+*.trace
+
+# =============================================================================
+# TESTING & COVERAGE
+# =============================================================================
+
+# Test coverage reports
+coverage/
+coverage.out
+coverage.html
+*.coverage
+*.cover
+
+# Test artifacts
+test-results/
+junit.xml
+test-report.xml
+
+# =============================================================================
+# CACHE & TEMPORARY
+# =============================================================================
+
+# Cache directories
+.cache/
+*.cache
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+
+# =============================================================================
+# PROJECT SPECIFIC
+# =============================================================================
+
+# Application specific
+uploads/
+downloads/
+data/
+storage/
+
+# Local development
+local/
+dev/
+development/
+
+# =============================================================================
+# MISC
+# =============================================================================
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Compressed files
+*.bz2
+*.gz
+*.xz
+*.zip
+*.tar.gz
+*.tgz
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.save 

@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/lucas-de-lima/go-auth-system/internal/auth"
 	"github.com/lucas-de-lima/go-auth-system/internal/controller/user"
+	"github.com/lucas-de-lima/go-auth-system/internal/domain"
 	"github.com/lucas-de-lima/go-auth-system/internal/repository"
 	"github.com/lucas-de-lima/go-auth-system/internal/routes"
 	"github.com/lucas-de-lima/go-auth-system/internal/service"
@@ -39,6 +40,32 @@ func main() {
 	// Inicializar serviços e repositórios
 	userRepository := repository.NewUserRepository(prisma.DB)
 
+	// Criar admin padrão se não existir
+	defaultAdminEmail := os.Getenv("DEFAULT_ADMIN_EMAIL")
+	if defaultAdminEmail == "" {
+		defaultAdminEmail = "admin@admin.com"
+	}
+	defaultAdminPassword := os.Getenv("DEFAULT_ADMIN_PASSWORD")
+	if defaultAdminPassword == "" {
+		defaultAdminPassword = "Admin123!@#"
+		log.Printf("[AVISO] Usando senha padrão para admin: %s", defaultAdminPassword)
+	}
+	adminExists, _ := userRepository.GetByEmail(defaultAdminEmail)
+	if adminExists == nil {
+		adminUser := &domain.User{
+			Email:    defaultAdminEmail,
+			Password: defaultAdminPassword,
+			Name:     "Administrador",
+			Roles:    []string{"admin"},
+		}
+		err := userRepository.Create(adminUser)
+		if err != nil {
+			log.Printf("[ERRO] Não foi possível criar admin padrão: %v", err)
+		} else {
+			log.Printf("[INFO] Usuário admin padrão criado: %s", defaultAdminEmail)
+		}
+	}
+
 	// Obter configurações do JWT do arquivo de ambiente
 	secretKey := os.Getenv("JWT_SECRET")
 	if secretKey == "" {
@@ -59,11 +86,12 @@ func main() {
 
 	userService := service.NewUserService(userRepository, jwtService)
 
-	// Inicializar o controller
+	// Inicializar os controllers
 	userController := user.NewUserController(userService)
+	adminController := user.NewAdminController(userService)
 
 	// Inicializar e configurar as rotas
-	userRoutes := routes.NewUserRoutes(userController, jwtService)
+	userRoutes := routes.NewUserRoutes(userController, jwtService, adminController)
 	userRoutes.Setup(router)
 
 	// Iniciar o servidor

@@ -50,11 +50,11 @@ func LoadConfig() *Config {
 }
 
 func loadServerConfig() ServerConfig {
-	port, _ := strconv.Atoi(getEnv("SERVER_PORT", "8080"))
+	port := mustAtoi(getEnv("SERVER_PORT", "8080"), 8080)
 
-	readTimeout, _ := strconv.Atoi(getEnv("SERVER_READ_TIMEOUT", "5"))
-	writeTimeout, _ := strconv.Atoi(getEnv("SERVER_WRITE_TIMEOUT", "10"))
-	idleTimeout, _ := strconv.Atoi(getEnv("SERVER_IDLE_TIMEOUT", "120"))
+	readTimeout := mustAtoi(getEnv("SERVER_READ_TIMEOUT", "5"), 5)
+	writeTimeout := mustAtoi(getEnv("SERVER_WRITE_TIMEOUT", "10"), 10)
+	idleTimeout := mustAtoi(getEnv("SERVER_IDLE_TIMEOUT", "120"), 120)
 
 	return ServerConfig{
 		Port:         port,
@@ -65,7 +65,7 @@ func loadServerConfig() ServerConfig {
 }
 
 func loadDatabaseConfig() DatabaseConfig {
-	dbPort, _ := strconv.Atoi(getEnv("DB_PORT", "5432"))
+	dbPort := mustAtoi(getEnv("DB_PORT", "5432"), 5432)
 
 	return DatabaseConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
@@ -78,8 +78,8 @@ func loadDatabaseConfig() DatabaseConfig {
 }
 
 func loadJWTConfig() JWTConfig {
-	expHours, _ := strconv.Atoi(getEnv("JWT_EXPIRATION_HOURS", "24"))
-	refreshExpHours, _ := strconv.Atoi(getEnv("JWT_REFRESH_EXPIRATION_HOURS", "168"))
+	expHours := mustAtoi(getEnv("JWT_EXPIRATION_HOURS", "24"), 24)
+	refreshExpHours := mustAtoi(getEnv("JWT_REFRESH_EXPIRATION_HOURS", "168"), 168)
 
 	return JWTConfig{
 		Secret:          getEnv("JWT_SECRET", "your_jwt_secret"),
@@ -87,6 +87,14 @@ func loadJWTConfig() JWTConfig {
 		RefreshSecret:   getEnv("JWT_REFRESH_SECRET", "your_refresh_secret"),
 		RefreshExpHours: refreshExpHours,
 	}
+}
+
+// mustAtoi tenta converter uma string para int, retornando o valor padrão em caso de erro
+func mustAtoi(s string, defaultValue int) int {
+	if v, err := strconv.Atoi(s); err == nil {
+		return v
+	}
+	return defaultValue
 }
 
 // GetDatabaseURL retorna a URL de conexão com o banco de dados

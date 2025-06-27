@@ -18,8 +18,9 @@ type JWTService struct {
 
 // TokenClaims define as claims customizadas para o token JWT
 type TokenClaims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
+	UserID string   `json:"user_id"`
+	Email  string   `json:"email"`
+	Roles  []string `json:"roles"`
 	jwt.RegisteredClaims
 }
 
@@ -40,6 +41,7 @@ func (s *JWTService) GenerateToken(user *domain.User) (string, error) {
 	claims := &TokenClaims{
 		UserID: user.ID,
 		Email:  user.Email,
+		Roles:  user.Roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -82,4 +84,31 @@ func (s *JWTService) GenerateRefreshToken(userID string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString([]byte(s.refreshKey))
+}
+
+// ValidateRefreshToken valida um refresh token e retorna as claims se válido
+func (s *JWTService) ValidateRefreshToken(tokenString string) (*jwt.RegisteredClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (any, error) {
+		return []byte(s.refreshKey), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, errors.New("refresh token inválido")
+}
+
+// GetRefreshKey retorna a chave de refresh (uso exclusivo para testes)
+func (s *JWTService) GetRefreshKey() string {
+	return s.refreshKey
+}
+
+// GetSecretKey retorna a chave secreta do access token (uso exclusivo para testes)
+func (s *JWTService) GetSecretKey() string {
+	return s.secretKey
 }

@@ -69,7 +69,12 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 func (m *AuthMiddleware) GinAuthenticate() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
+		ip := c.ClientIP()
+		rota := c.FullPath()
+		userAgent := c.Request.UserAgent()
+
 		if authHeader == "" {
+			logging.Warning("[%s] [%s] [%s] Tentativa de acesso sem token de autenticação", ip, rota, userAgent)
 			errors.GinHandleError(c, errors.ErrMissingToken)
 			c.Abort()
 			return
@@ -78,6 +83,7 @@ func (m *AuthMiddleware) GinAuthenticate() gin.HandlerFunc {
 		// Extrai o token do cabeçalho (formato: "Bearer <token>")
 		tokenParts := strings.Split(authHeader, " ")
 		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+			logging.Warning("[%s] [%s] [%s] Formato de token inválido: '%s'", ip, rota, userAgent, authHeader)
 			errors.GinHandleError(c, errors.ErrBadRequest.WithMessage("Formato de autorização inválido"))
 			c.Abort()
 			return
@@ -86,7 +92,7 @@ func (m *AuthMiddleware) GinAuthenticate() gin.HandlerFunc {
 		token := tokenParts[1]
 		claims, err := m.jwtService.ValidateToken(token)
 		if err != nil {
-			logging.Error("Token inválido: %v", err)
+			logging.Warning("[%s] [%s] [%s] Token inválido: %v", ip, rota, userAgent, err)
 			errors.GinHandleError(c, errors.ErrInvalidToken.WithError(err))
 			c.Abort()
 			return
@@ -95,6 +101,9 @@ func (m *AuthMiddleware) GinAuthenticate() gin.HandlerFunc {
 		// Adiciona informações do usuário ao contexto
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)
+		c.Set("roles", claims.Roles)
+
+		logging.Info("[%s] [%s] [%s] Autenticação bem-sucedida para user_id=%s, email=%s", ip, rota, userAgent, claims.UserID, claims.Email)
 
 		// Continua para o próximo handler
 		c.Next()
@@ -122,21 +131,37 @@ func (m *AuthMiddleware) RequireRole(role string, next http.Handler) http.Handle
 // GinRequireRole verifica se o usuário tem um papel específico (versão Gin)
 func (m *AuthMiddleware) GinRequireRole(role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Aqui você pode implementar a verificação de papéis/permissões
-		// Por exemplo, buscar o usuário no banco de dados e verificar seus papéis
-
-		// Por enquanto, apenas verificamos se o usuário está autenticado
+		ip := c.ClientIP()
+		rota := c.FullPath()
+		userAgent := c.Request.UserAgent()
 		userID, exists := c.Get("user_id")
-		if !exists {
-			errors.GinHandleError(c, errors.ErrUnauthorized)
+		userEmail, _ := c.Get("user_email")
+
+		// Busca as roles do contexto (claims do JWT)
+		rolesIface, hasRoles := c.Get("roles")
+		var roles []string
+		if hasRoles {
+			roles, _ = rolesIface.([]string)
+		}
+
+		if !exists || !hasRoles || !containsRole(roles, role) {
+			logging.Warning("[%s] [%s] [%s] Acesso negado: usuário (id=%v, email=%v) não possui o papel '%s'", ip, rota, userAgent, userID, userEmail, role)
+			errors.GinHandleError(c, errors.ErrForbidden.WithMessage("Acesso negado: permissão insuficiente"))
 			c.Abort()
 			return
 		}
 
-		// Aqui você poderia verificar se o usuário tem o papel necessário
-		logging.Info("Usuário %v está acessando recurso protegido com papel %s", userID, role)
-
-		// Continua para o próximo handler
+		logging.Info("[%s] [%s] [%s] Usuário autorizado (id=%v, email=%v) com papel '%s'", ip, rota, userAgent, userID, userEmail, role)
 		c.Next()
 	}
+}
+
+// containsRole verifica se o slice de roles contém o papel exigido
+func containsRole(roles []string, role string) bool {
+	for _, r := range roles {
+		if r == role {
+			return true
+		}
+	}
+	return false
 }
